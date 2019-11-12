@@ -24,10 +24,17 @@ heritrixUrl: https://localhost:8443
 heritrixUser: admin:admin
 heritrixContactUs: https://paracrawl.eu/ 
 
-hosts: ["www.totoku.co.jp", "www.totoku.com"]
+#hosts: ["www.totoku.co.jp", "www.totoku.com"]
+hosts: ["yotsutake.co.jp"]
 
-#onlyConcat: true 
-onlyPreprocessing: true
+task: [
+    "concat",
+    "preprocessing",
+    "align-document",
+    "align-paragraph",
+    #    "align-sentence",
+    #    "filtering",
+]
 
 disableFTFY: false
 
@@ -48,6 +55,7 @@ initCorpusTrainPrefix: [
 
 #documentAligner: DIC
 documentAligner: URL
+paragraphAligner: STRAND
 
 hunalignThreshold: 0.0
 

@@ -37,6 +37,7 @@ RUN pip --no-cache-dir install \
         jedi \
         flake8 \
         autopep8 \
+        tqdm \
         Cython==0.29.14 \
         Click==7.0 \
         beautifulsoup4==4.8.1 \
