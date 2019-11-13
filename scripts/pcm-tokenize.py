@@ -20,12 +20,10 @@ import os
 import argparse
 import base64
 import string
-import ast
-import lzma
 from external_processor import ExternalTextProcessor
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/utils")
-from utils.common import open_xz_or_gzip_or_plain
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../utils")
+from common import open_xz_or_gzip_or_plain
 
 
 def extract_encoded_text(encoded, sent_tokeniser, word_tokeniser, morph_analyser):

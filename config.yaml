@@ -5,6 +5,11 @@ permanentDir: /data/bitextor/permanent/bitextor-output
 transientDir: /data/bitextor/transient
 dataDir: /data/bitextor/data
 
+preprocess: /root/preprocess
+mgiza: /root/mgiza
+mkcls: /root/clustercat/bin/mkcls
+hunalign: /root/hunalign
+
 wordTokenizers: {
     en: /root/preprocess/moses/tokenizer/tokenizer.perl -q -b -a -l en,
     ja: mecab -Owakati 
@@ -28,11 +33,13 @@ heritrixContactUs: https://paracrawl.eu/
 hosts: ["yotsutake.co.jp"]
 
 task: [
-    "concat",
+    #    "build_bidic",
+    #    "build_hunalign_dic",
+    #    "concat",
     "preprocessing",
     "align-document",
     "align-paragraph",
-    #    "align-sentence",
+    "align-sentence",
     #    "filtering",
 ]
 
@@ -49,22 +56,24 @@ langId: cld2
 dic: /data/bitextor/dic_data/en-ja.dic
 initCorpusTrainPrefix: [
     "/data/bitextor/dic_data/GlobalVoices/GlobalVoices.en-jp",
-    "/data/bitextor/dic_data/OpenSubtitles/OpenSubtitles.en-ja",
-    "/data/bitextor/dic_data/Tatoeba/Tatoeba.en-ja",
+    #    "/data/bitextor/dic_data/OpenSubtitles/OpenSubtitles.en-ja",
+    #    "/data/bitextor/dic_data/Tatoeba/Tatoeba.en-ja",
 ]
 
 #documentAligner: DIC
 documentAligner: URL
 paragraphAligner: STRAND
+sentenceAligner: HUNALIGN
 
+hunalignDic: /data/bitextor/dic_data/hunalign.en-ja.dic
 hunalignThreshold: 0.0
 
 bicleaner: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
 bicleanerThreshold: 0.4
 bicleanerCorpusTrainingPrefix: [
     "/data/bitextor/dic_data/GlobalVoices/GlobalVoices.en-jp",
-    "/data/bitextor/dic_data/OpenSubtitles/OpenSubtitles.en-ja",
-    "/data/bitextor/dic_data/Tatoeba/Tatoeba.en-ja",
+    #    "/data/bitextor/dic_data/OpenSubtitles/OpenSubtitles.en-ja",
+    #    "/data/bitextor/dic_data/Tatoeba/Tatoeba.en-ja",
 ]
 
 bifixer: false

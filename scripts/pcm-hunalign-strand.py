@@ -280,7 +280,7 @@ def run_hunaligner(filename_s, filename_t, dic, hunaligndir):
 @click.option("--tmp_dir", "-t", help="")
 @click.option("--dp_threshould", default=0.5, help="")
 @click.option("--cost_threshould", default=0.2, help="")
-@click.option("--loosy", is_flag=True, default=False, help="")
+@click.option("--loosy", is_flag=True, default=True, help="")
 @click.option("--batch_size", default=10, help="")
 def main(align_ann,
          align_data,

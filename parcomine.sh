@@ -1,6 +1,6 @@
 CONFIGFILE="config.yaml"
 NUMJOBS=1
-INCREMENTAL="true"
+ONLY_NEW_HOSTS="False"
 HOSTFILE=""
 DELETE=""
 
@@ -40,7 +40,7 @@ do
 done
 
 if [ -n "$DELETE" ]; then
-    snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" --config hostsFile="${HOSTFILE}" incremental="${INCREMENTAL}" --delete-all-output
+    snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" --config hostsFile="${HOSTFILE}" --config onlyNewHosts="${ONLY_NEW_HOSTS}" --delete-all-output
 fi
 
-snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" -j "${NUMJOBS}" --config hostsFile="${HOSTFILE}" incremental="${INCREMENTAL}" --keep-going
+snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" -j "${NUMJOBS}" --config hostsFile="${HOSTFILE}" --config onlyNewHosts="${ONLY_NEW_HOSTS}" --keep-going

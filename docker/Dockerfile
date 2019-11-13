@@ -84,10 +84,10 @@ RUN git clone https://github.com/bitextor/hunalign.git && \
 RUN git clone https://github.com/kpu/preprocess.git && \
     cd preprocess && git checkout 2d78e88 && cmake . && make -j4
 
-## additional installation log
+RUN git clone https://github.com/jonsafari/clustercat.git && \
+    cd clustercat && git checkout b19f171 && make -j4
 
-#RUN git clone https://github.com/hiropppe/strand-aligner.git && \
-#    cd strand-aligner/maxend && make && python setup.py install && \
-#    cd ../strand && make && python setup.py develop
+RUN git clone https://github.com/hiropppe/strand-aligner.git && \
+    cd strand-aligner && make && make install
 
 CMD [ "/bin/bash" ]

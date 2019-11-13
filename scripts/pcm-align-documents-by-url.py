@@ -6,11 +6,11 @@ import sys
 import argparse
 import tldextract
 
-from utils.common import open_xz_or_gzip_or_plain
 from tqdm import tqdm
 from urllib.parse import urlparse
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/utils")
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../utils")
+from common import open_xz_or_gzip_or_plain
 
 oparser = argparse.ArgumentParser(description="usage: %prog [options]\nTool that processes a .ridx (reverse index) "
                                               "file (either from a file or from the standard input) and produces a "
