@@ -17,28 +17,31 @@ RUN apt-get update \
 
 RUN apt-get update && \
     apt-get install -y software-properties-common build-essential cmake pkg-config \
-        vim wget bzip2 unzip git less tree \
+        vim wget bzip2 unzip less tree \
         libboost-all-dev liblzma-dev liblbfgs-dev \
         openjdk-8-jdk pdftohtml \
+        zlib1g-dev libbz2-dev \
+        ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion \
         language-pack-ja-base && \
     apt-get clean
 
-RUN add-apt-repository -y ppa:jonathonf/python-3.6 \
- && apt-get update \
- && apt-get install -y python3.6 python3.6-dev \
- && wget https://bootstrap.pypa.io/get-pip.py \
- && python3.6 get-pip.py \
- && ln -fs /usr/bin/python3.6 /usr/bin/python3 \
- && ln -fs /usr/bin/python3.6 /usr/bin/python
+RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh -O ~/anaconda.sh && \
+    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
+    rm ~/anaconda.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc && \
+    find /opt/conda/ -follow -type f -name '*.a' -delete && \
+    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
+    /opt/conda/bin/conda clean -afy
 
-RUN pip install -U pip
-RUN pip install --no-cache-dir -U setuptools
-RUN pip --no-cache-dir install \
-        jedi \
-        flake8 \
-        autopep8 \
-        tqdm \
-        Cython==0.29.14 \
+RUN /opt/conda/bin/conda  install -y pytorch==1.2.0 torchvision==0.4.0 faiss-gpu==1.6.0 cudatoolkit=10.0 -c pytorch
+
+RUN /opt/conda/bin/pip install setuptools
+RUN /opt/conda/bin/pip install ipykernel jedi flake8 autopep8 tqdm \
+        Cython==0.29.6 \
+        transliterate==1.10.2 \
+        jieba==0.39 \
         Click==7.0 \
         beautifulsoup4==4.8.1 \
         lxml==4.4.1 \
@@ -56,9 +59,7 @@ RUN pip --no-cache-dir install \
         mmh3==2.5.1 \
         python-pdfextract==1.0.1.2 \
         git+https://github.com/slaveofcode/boilerpipe3.git \
-        pycld2==0.41 \
-        ipykernel
-
+        pycld2==0.41
 
 WORKDIR /root
 
@@ -68,12 +69,15 @@ RUN git clone --depth 1 https://github.com/taku910/mecab && \
     make && \
     make check && \
     make install && \
-    pip install --no-cache-dir mecab-python3 && \
+    /opt/conda/bin/pip install --no-cache-dir mecab-python3 && \
     ldconfig && \
     cd ../mecab-ipadic && \
     ./configure --with-charset=utf8 && \
     make && \
     make install
+
+RUN git clone https://github.com/moses-smt/mosesdecoder.git && \
+    cd mosesdecoder && ./bjam -j4
 
 RUN git clone https://github.com/moses-smt/mgiza.git && \
     cd mgiza/mgizapp && git checkout 3dd8ef6 && cmake . && make
@@ -87,7 +91,21 @@ RUN git clone https://github.com/kpu/preprocess.git && \
 RUN git clone https://github.com/jonsafari/clustercat.git && \
     cd clustercat && git checkout b19f171 && make -j4
 
+ENV PATH /opt/conda/bin:$PATH
 RUN git clone https://github.com/hiropppe/strand-aligner.git && \
     cd strand-aligner && make && make install
+
+RUN git clone https://github.com/facebookresearch/LASER.git
+##  RUN git checkout 311b25e  # commit hash when tested
+ENV LASER /root/LASER
+RUN echo "export LASER=$LASER" >> ~/.bashrc
+
+WORKDIR $LASER
+#RUN /bin/bash ./install_models.sh
+#RUN /bin/bash ./install_external_tools.sh
+RUN mkdir -p ./tools-external/mecab/bin && \
+    ln -s /usr/local/bin/mecab /root/LASER/tools-external/mecab/bin/mecab
+
+WORKDIR /root
 
 CMD [ "/bin/bash" ]
