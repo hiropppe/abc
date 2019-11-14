@@ -5,19 +5,19 @@ permanentDir: /data/bitextor/permanent/bitextor-output
 transientDir: /data/bitextor/transient
 dataDir: /data/bitextor/data
 
-preprocess: /root/preprocess
+moses: /root/mosesdecoder
 mgiza: /root/mgiza
 mkcls: /root/clustercat/bin/mkcls
 hunalign: /root/hunalign
 
 wordTokenizers: {
-    en: /root/preprocess/moses/tokenizer/tokenizer.perl -q -b -a -l en,
+    en: /root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en,
     ja: mecab -Owakati 
 }
 
 sentenceSplitters: {
-    en: /root/preprocess/moses/ems/support/split-sentences.perl -q -b -l en,
-    ja: /root/preprocess/moses/ems/support/split-sentences.perl -q -b -l yue,
+    en: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l en,
+    ja: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l ja,
 }
 
 lang1: en

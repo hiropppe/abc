@@ -67,7 +67,7 @@ shell("mkdir -p "+TMP_DIR)
 
 PROFILING = ""
 
-PREPROCESS = Path(config["preprocess"])
+MOSES = Path(config["moses"])
 HUNALIGN = Path(config["hunalign"])
 MGIZA = Path(config["mgiza"])
 
@@ -462,7 +462,7 @@ rule lowercase:
     output:
         "{prefix}.tok.low.{lang}"
     shell:
-        "xzcat {input} | {PROFILING} {PREPROCESS}/moses/tokenizer/lowercase.perl > {output}"
+        "xzcat {input} | {PROFILING} {MOSES}/scripts/tokenizer/lowercase.perl > {output}"
 
 rule clean:
     input:
