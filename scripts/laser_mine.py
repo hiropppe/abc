@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 
 from collections import namedtuple
+from pathlib import Path
 
 # get environment
 assert os.environ.get('LASER'), 'Please set the enviornment variable LASER'
@@ -20,204 +21,162 @@ LASER = os.environ['LASER']
 sys.path.append(LASER + '/source')
 sys.path.append(LASER + '/source/lib')
 sys.path.append(LASER + '/source/tools')
-from embed import SentenceEncoder, EncodeLoad, EncodeFile, EmbedLoad  # noqa
+from embed import SentenceEncoder, EncodeLoad, EncodeFile, EmbedLoad, buffered_read, buffered_arange, convert_padding_direction, Encoder, EncodeTime, EncodeFilep, EmbedMmap  # noqa
+from mine_bitexts import TextLoadUnify, knn, knnGPU, knnCPU, score, score_candidates
 from text_processing import Token, BPEfastApply  # noqa
 
 
-SPACE_NORMALIZER = re.compile("\s+")
-Batch = namedtuple('Batch', 'srcs tokens lengths')
+###############################################################################
+#
+# Embed Main
+#
+###############################################################################
+
+def Embed(tmpdir, ifname, encoder, token_lang, bpe_codes, buffer_size, verbose):
+    output = os.path.join(tmpdir, 'emb')
+
+    if token_lang != '--':
+        tok_fname = os.path.join(tmpdir, 'tok')
+        Token(ifname,
+              tok_fname,
+              lang=token_lang,
+              romanize=True if token_lang == 'el' else False,
+              lower_case=True, gzip=False,
+              verbose=verbose, over_write=False)
+        ifname = tok_fname
+
+    if bpe_codes:
+        bpe_fname = os.path.join(tmpdir, 'bpe')
+        BPEfastApply(ifname,
+                     bpe_fname,
+                     bpe_codes,
+                     verbose=verbose, over_write=False)
+        ifname = bpe_fname
+
+    EncodeFile(encoder,
+               ifname,
+               output,
+               verbose=verbose, over_write=False,
+               buffer_size=buffer_size)
+
+    return output
 
 
-def buffered_read(fp, buffer_size):
-    buffer = []
-    for src_str in fp:
-        buffer.append(src_str.strip())
-        if len(buffer) >= buffer_size:
-            yield buffer
-            buffer = []
+###############################################################################
+#
+# Mine Main
+#
+###############################################################################
 
-    if len(buffer) > 0:
-        yield buffer
-
-
-def buffered_arange(max):
-    if not hasattr(buffered_arange, 'buf'):
-        buffered_arange.buf = torch.LongTensor()
-    if max > buffered_arange.buf.numel():
-        torch.arange(max, out=buffered_arange.buf)
-    return buffered_arange.buf[:max]
-
-
-# TODO Do proper padding from the beginning
-def convert_padding_direction(src_tokens, padding_idx, right_to_left=False, left_to_right=False):
-    assert right_to_left ^ left_to_right
-    pad_mask = src_tokens.eq(padding_idx)
-    if not pad_mask.any():
-        # no padding, return early
-        return src_tokens
-    if left_to_right and not pad_mask[:, 0].any():
-        # already right padded
-        return src_tokens
-    if right_to_left and not pad_mask[:, -1].any():
-        # already left padded
-        return src_tokens
-    max_len = src_tokens.size(1)
-    range = buffered_arange(max_len).type_as(src_tokens).expand_as(src_tokens)
-    num_pads = pad_mask.long().sum(dim=1, keepdim=True)
-    if right_to_left:
-        index = torch.remainder(range - num_pads, max_len)
+def Mine(src, trg, encoding, src_embeddings, trg_embeddings, output, unify, mode, retrieval, margin, neighborhood, gpu, dim, threshold, verbose):
+    print('LASER: tool to search, score or mine bitexts')
+    if gpu:
+        print(' - knn will run on all available GPUs (recommended)')
     else:
-        index = torch.remainder(range + num_pads, max_len)
-    return src_tokens.gather(1, index)
+        print(' - knn will run on CPU (slow)')
 
+    args = {"encodeing": encoding, "unify": unify, "verbose": verbose}
+    src_inds, src_sents = TextLoadUnify(src, args)
+    trg_inds, trg_sents = TextLoadUnify(trg, args)
 
-class Encoder(nn.Module):
-    def __init__(
-            self, num_embeddings, padding_idx, embed_dim=320, hidden_size=512, num_layers=1, bidirectional=False,
-            left_pad=True, padding_value=0.
-    ):
-        super().__init__()
+    def unique_embeddings(emb, ind, verbose=False):
+        aux = {j: i for i, j in enumerate(ind)}
+        if verbose:
+            print(' - unify embeddings: {:d} -> {:d}'.format(len(emb), len(aux)))
+        return emb[[aux[i] for i in range(len(aux))]]
 
-        self.num_layers = num_layers
-        self.bidirectional = bidirectional
-        self.hidden_size = hidden_size
+    # load the embeddings
+    x = EmbedLoad(src_embeddings, dim, verbose=verbose)
+    if unify:
+        x = unique_embeddings(x, src_inds, verbose)
+    faiss.normalize_L2(x)
+    y = EmbedLoad(trg_embeddings, dim, verbose=verbose)
+    if unify:
+        y = unique_embeddings(y, trg_inds, verbose)
+    faiss.normalize_L2(y)
 
-        self.padding_idx = padding_idx
-        self.embed_tokens = nn.Embedding(num_embeddings, embed_dim, padding_idx=self.padding_idx)
+    # calculate knn in both directions
+    if retrieval != 'bwd':
+        if verbose:
+            print(' - perform {:d}-nn source against target'.format(neighborhood))
+        x2y_sim, x2y_ind = knn(x, y, min(y.shape[0], neighborhood), gpu)
+        x2y_mean = x2y_sim.mean(axis=1)
 
-        self.lstm = nn.LSTM(
-            input_size=embed_dim,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            bidirectional=bidirectional,
-        )
-        self.left_pad = left_pad
-        self.padding_value = padding_value
+    if retrieval != 'fwd':
+        if verbose:
+            print(' - perform {:d}-nn target against source'.format(neighborhood))
+        y2x_sim, y2x_ind = knn(y, x, min(x.shape[0], neighborhood), gpu)
+        y2x_mean = y2x_sim.mean(axis=1)
 
-        self.output_units = hidden_size
-        if bidirectional:
-            self.output_units *= 2
+    # margin function
+    if margin == 'absolute':
+        def margin(a, b): return a
+    elif margin == 'distance':
+        def margin(a, b): return a - b
+    else:  # margin == 'ratio':
+        def margin(a, b): return a / b
 
-    def forward(self, src_tokens, src_lengths):
-        if self.left_pad:
-            # convert left-padding to right-padding
-            src_tokens = convert_padding_direction(
-                src_tokens,
-                self.padding_idx,
-                left_to_right=True,
-            )
+    fout = open(output, mode='w', encoding=encoding, errors='surrogateescape')
 
-        bsz, seqlen = src_tokens.size()
+    if mode == 'search':
+        if verbose:
+            print(' - Searching for closest sentences in target')
+            print(' - writing alignments to {:s}'.format(output))
+        scores = score_candidates(x, y, x2y_ind, x2y_mean, y2x_mean, margin, verbose)
+        best = x2y_ind[np.arange(x.shape[0]), scores.argmax(axis=1)]
 
-        # embed tokens
-        x = self.embed_tokens(src_tokens)
+        nbex = x.shape[0]
+        ref = np.linspace(0, nbex-1, nbex).astype(int)  # [0, nbex)
+        err = nbex - np.equal(best.reshape(nbex), ref).astype(int).sum()
+        print(' - errors: {:d}={:.2f}%'.format(err, 100*err/nbex))
+        for i in src_inds:
+            print(trg_sents[best[i]], file=fout)
 
-        # B x T x C -> T x B x C
-        x = x.transpose(0, 1)
+    elif mode == 'score':
+        for i, j in zip(src_inds, trg_inds):
+            s = score(x[i], y[j], x2y_mean[i], y2x_mean[j], margin)
+            print(s, src_sents[i], trg_sents[j], sep='\t', file=fout)
 
-        # pack embedded source tokens into a PackedSequence
-        packed_x = nn.utils.rnn.pack_padded_sequence(x, src_lengths.data.tolist())
+    elif mode == 'mine':
+        if verbose:
+            print(' - mining for parallel data')
+        fwd_scores = score_candidates(x, y, x2y_ind, x2y_mean, y2x_mean, margin, verbose)
+        bwd_scores = score_candidates(y, x, y2x_ind, y2x_mean, x2y_mean, margin, verbose)
+        fwd_best = x2y_ind[np.arange(x.shape[0]), fwd_scores.argmax(axis=1)]
+        bwd_best = y2x_ind[np.arange(y.shape[0]), bwd_scores.argmax(axis=1)]
+        if verbose:
+            print(' - writing alignments to {:s}'.format(output))
+            if threshold > 0:
+                print(' - with threshold of {:f}'.format(threshold))
+        if retrieval == 'fwd':
+            for i, j in enumerate(fwd_best):
+                print(fwd_scores[i].max(), src_sents[i], trg_sents[j], sep='\t', file=fout)
+        if retrieval == 'bwd':
+            for j, i in enumerate(bwd_best):
+                print(bwd_scores[j].max(), src_sents[i], trg_sents[j], sep='\t', file=fout)
+        if retrieval == 'intersect':
+            for i, j in enumerate(fwd_best):
+                if bwd_best[j] == i:
+                    print(fwd_scores[i].max(), src_sents[i], trg_sents[j], sep='\t', file=fout)
+        if retrieval == 'max':
+            indices = np.stack((np.concatenate((np.arange(x.shape[0]), bwd_best)),
+                                np.concatenate((fwd_best, np.arange(y.shape[0])))), axis=1)
+            scores = np.concatenate((fwd_scores.max(axis=1), bwd_scores.max(axis=1)))
+            seen_src, seen_trg = set(), set()
+            for i in np.argsort(-scores):
+                src_ind, trg_ind = indices[i]
+                if src_ind not in seen_src and trg_ind not in seen_trg:
+                    seen_src.add(src_ind)
+                    seen_trg.add(trg_ind)
+                    if scores[i] > threshold:
+                        print(scores[i], src_sents[src_ind],
+                              trg_sents[trg_ind], sep='\t', file=fout)
 
-        # apply LSTM
-        if self.bidirectional:
-            state_size = 2 * self.num_layers, bsz, self.hidden_size
-        else:
-            state_size = self.num_layers, bsz, self.hidden_size
-        h0 = x.data.new(*state_size).zero_()
-        c0 = x.data.new(*state_size).zero_()
-        packed_outs, (final_hiddens, final_cells) = self.lstm(packed_x, (h0, c0))
-
-        # unpack outputs and apply dropout
-        x, _ = nn.utils.rnn.pad_packed_sequence(packed_outs, padding_value=self.padding_value)
-        assert list(x.size()) == [seqlen, bsz, self.output_units]
-
-        if self.bidirectional:
-            def combine_bidir(outs):
-                return torch.cat([
-                    torch.cat([outs[2 * i], outs[2 * i + 1]], dim=0).view(1, bsz, self.output_units)
-                    for i in range(self.num_layers)
-                ], dim=0)
-
-            final_hiddens = combine_bidir(final_hiddens)
-            final_cells = combine_bidir(final_cells)
-
-        encoder_padding_mask = src_tokens.eq(self.padding_idx).t()
-
-        # Set padded outputs to -inf so they are not selected by max-pooling
-        padding_mask = src_tokens.eq(self.padding_idx).t().unsqueeze(-1)
-        if padding_mask.any():
-            x = x.float().masked_fill_(padding_mask, float('-inf')).type_as(x)
-
-        # Build the sentence embedding by max-pooling over the encoder outputs
-        sentemb = x.max(dim=0)[0]
-
-        return {
-            'sentemb': sentemb,
-            'encoder_out': (x, final_hiddens, final_cells),
-            'encoder_padding_mask': encoder_padding_mask if encoder_padding_mask.any() else None
-        }
-
-
-def EncodeTime(t):
-    t = int(time.time() - t)
-    if t < 1000:
-        print(' in {:d}s'.format(t))
-    else:
-        print(' in {:d}m{:d}s'.format(t // 60, t % 60))
-
-
-# Encode sentences (existing file pointers)
-def EncodeFilep(encoder, inp_file, out_file, buffer_size=10000, verbose=False):
-    n = 0
-    t = time.time()
-    for sentences in buffered_read(inp_file, buffer_size):
-        encoder.encode_sentences(sentences).tofile(out_file)
-        n += len(sentences)
-        if verbose and n % 10000 == 0:
-            print('\r - Encoder: {:d} sentences'.format(n), end='')
-    if verbose:
-        print('\r - Encoder: {:d} sentences'.format(n), end='')
-        EncodeTime(t)
-
-
-# Get memory mapped embeddings
-def EmbedMmap(fname, dim=1024, dtype=np.float32, verbose=False):
-    nbex = int(os.path.getsize(fname) / dim / np.dtype(dtype).itemsize)
-    E = np.memmap(fname, mode='r', dtype=dtype, shape=(nbex, dim))
-    if verbose:
-        print(' - embeddings on disk: {:s} {:d} x {:d}'.format(fname, nbex, dim))
-    return E
-
-
-def embed(sents, token_lang):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        ifname = ''  # stdin will be used
-        if token_lang != '--':
-            tok_fname = os.path.join(tmpdir, 'tok')
-            Token(ifname,
-                  tok_fname,
-                  lang=token_lang,
-                  romanize=True if token_lang == 'el' else False,
-                  lower_case=True, gzip=False,
-                  verbose=verbose, over_write=False)
-            ifname = tok_fname
-
-        if bpe_codes:
-            bpe_fname = os.path.join(tmpdir, 'bpe')
-            BPEfastApply(ifname,
-                         bpe_fname,
-                         bpe_codes,
-                         verbose=verbose, over_write=False)
-            ifname = bpe_fname
-
-        EncodeFile(encoder,
-                   ifname,
-                   output,
-                   verbose=verbose, over_write=False,
-                   buffer_size=buffer_size)
+    fout.close()
 
 
 @click.command()
+# embed params
 @click.option("--src", help="Source sentences")
 @click.option("--tgt", help="Target sentences")
 @click.option("--offset", help="Sentence offset for document")
@@ -231,17 +190,21 @@ def embed(sents, token_lang):
 @click.option("--max_tokens", type=int, default=12000, help="Maximum number of tokens to process in a batch")
 @click.option("--max_sentences", type=int, default=None, help="Maximum number of sentences to process in a batch")
 @click.option("--enc_cpu", is_flag=True, default=True, help="Use GPU to encode sentences")
+# mining params
+@click.option("--encoding", default="utf8", help="Character encoding for input/output")
 @click.option("--mode", type=click.Choice(["search", "score", "mine"]), default="mine", help="Execution mode")
 @click.option("--neighborhood", "-k", type=int, default=4, help="Neighborhood size")
 @click.option("--margin", type=click.Choice(["absolute", "distance", "ratio"]), default="ratio", help="Margin function")
 @click.option("--retrieval", type=click.Choice(["fwd", "bwd", "max", "intersect"]), default="max", help="Retrieval strategy")
-@click.option("--unify", is_flag=True, default=False, help="Unify texts")
-@click.option("--knn_gpu", is_flag=True, default=False, help="Run kbb on all available GPUs")
+@click.option("--unify", is_flag=True, default=True, help="Unify texts")
+@click.option("--knn_gpu", is_flag=True, default=True, help="Run kbb on all available GPUs")
 @click.option("--stable", is_flag=True, default=False, help="Use stable merge sort instead of quick sort")
+@click.option("--dim", type=int, default=1024, help="Embedding dimensionality")
+@click.option("--threshold", type=float, default=0, help="Threshold on extracted bitexts")
 @click.option("--verbose", is_flag=True, default=False, help="Detailed output")
-def mine(input, offset, slang, tlang, token_slang, token_tlang,
+def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
          encoder, bpe_codes, buffer_size, max_tokens, max_sentences, enc_cpu,
-         mode, neighborhood, margin, retrieval, unify, knn_gpu, stable, verbose):
+         encoding, mode, neighborhood, margin, retrieval, unify, knn_gpu, stable, dim, threshold, verbose):
 
     buffer_size = max(buffer_size, 1)
     assert not max_sentences or max_sentences <= buffer_size, \
@@ -256,14 +219,62 @@ def mine(input, offset, slang, tlang, token_slang, token_tlang,
                               sort_kind='mergesort' if stable else 'quicksort',
                               cpu=enc_cpu)
 
-    src_sents = [s.strip() for s in open(src)]
-    tgt_sents = [t.strip() for t in open(tgt)]
-
     if offset:
-        doc_offset = [(d[2], d[2], d[4], d[5]) for d in [line.strip().split() for line in open(offset)]
-        for soff, s_len, toff, t_len in doc_offset:
-            src_embeds= embed(src_sents[soff: soff+slen], slang if token_slang else "--")
-            tgt_embeds= embed(tgt_sents[toff: toff+tlen], tlang if token_tlang else "--")
+        src_sents = [s.strip() for s in open(src)]
+        tgt_sents = [t.strip() for t in open(tgt)]
+        doc_offset = [(d[1], d[2], d[4], d[5])
+                      for d in [line.strip().split() for line in open(offset)]]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            src_tmpdir_path = tmpdir_path / slang
+            tgt_tmpdir_path = tmpdir_path / tlang
+
+            src_tmpdir_path.mkdir()
+            tgt_tmpdir_path.mkdir()
+            for s_off, s_len, t_off, t_len in doc_offset:
+                src_txt = src_tmpdir_path / 'txt'
+                tgt_txt = tgt_tmpdir_path / 'txt'
+
+                with open(src_txt, "w") as fw:
+                    print("\n".join(src_sents), file=fw)
+                with open(tgt_txt, "w") as fw:
+                    print("\n".join(tgt_sents), file=fw)
+
+                src_embeddings = Embed(src_tmpdir_path.__str__(),
+                                       src_txt.__str__(),
+                                       encoder,
+                                       slang if token_slang else "--",
+                                       bpe_codes,
+                                       buffer_size,
+                                       verbose)
+                tgt_embeddings = Embed(tgt_tmpdir_path.__str__(),
+                                       tgt_txt.__str__(),
+                                       encoder,
+                                       tlang if token_tlang else "--",
+                                       bpe_codes,
+                                       buffer_size,
+                                       verbose)
+
+                mine_output = tmpdir_path / "mine"
+
+                Mine(src_txt, tgt_txt, encoding,
+                     src_embeddings, tgt_embeddings,
+                     mine_output.__str__(),
+                     unify,
+                     mode,
+                     retrieval,
+                     margin,
+                     neighborhood,
+                     knn_gpu,
+                     dim,
+                     threshold,
+                     verbose)
+
+    else:
+        src_embeddings = Embed(src, slang if token_slang else "--")
+        src_embeddings = Embed(tgt, tlang if token_tlang else "--")
 
 
 if __name__ == "__main__":

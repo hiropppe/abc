@@ -342,23 +342,25 @@ rule prepare_laser_mine:
     input:
         f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz"
     output:
-        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.ann",
-        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc"
+        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG1}",
+        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}",
+        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.offset",
     params:
         prefix = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}'
     shell:
-        '{PROFILING} ./scripts/prepare_lazer_mine.py -i {input} -p {params.prefix} -l1 {LANG1} -l2 {LANG2} -s1 {SENTTOK1} -s2 {SENTTOK2}'
+        'xzcat -T 0 {input} | {PROFILING} ./scripts/prepare_lazer_mine.py -p {params.prefix} -sl {LANG1} -tl {LANG2} -s1 {SENTTOK1} -s2 {SENTTOK2}'
 
 rule lazer_mine:
     input:
-        an = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.ann",
-        cc = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc"
+        src = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG1}",
+        tgt = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}".
+        ann = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.offset",
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.laz'
     shell:
-        '{PROFILING} ./scripts/lazer_mine.py -a {input.an} -c {input.cc} -l1 {LANG1} -l2 {LANG2}'
-        '  --encoder {LASER_ENCODER} --bpe-codes {LASER_BPE_CODES} {LASER_GPU}'
-        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_GPU} > {output}'
+        '{PROFILING} ./scripts/lazer_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
+        '  --encoder {LASER_ENCODER} --bpe-codes {LASER_BPE_CODES} {LASER_ENC_CPU}'
+        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_GPU} > {output}'
 
 # ================================== STRAND ALIGNMENT ================================== #
 
