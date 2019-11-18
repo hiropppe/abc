@@ -40,7 +40,7 @@ oparser.add_argument("-n", "--num_candidates", help="Amount of alignment candida
 options = oparser.parse_args()
 
 
-def more_2letter(lang):
+def more_codes(lang):
     if lang == "ja":
         return ("ja", "jp", "jpn", "japanese", "japan")
     if lang == "en":
@@ -62,8 +62,8 @@ l2_urls = read(options.url2)
 l1_texts = read(options.text1)
 l2_texts = read(options.text2)
 
-re_l1_lang = re.compile(r"\b({:s})\b".format("|".join(more_2letter(options.lang1))))
-re_l2_lang = re.compile(r"\b({:s})\b".format("|".join(more_2letter(options.lang2))))
+re_l1_lang = re.compile(r"\b({:s})\b".format("|".join(more_codes(options.lang1))))
+re_l2_lang = re.compile(r"\b({:s})\b".format("|".join(more_codes(options.lang2))))
 re_sla2 = re.compile("(?<!:)//")
 
 
@@ -95,8 +95,8 @@ def match_url(l1_url, l2_url):
     l2_fragment = l2_parsed.fragment
 
     if (l1_netloc != l2_netloc and l1_path == l2_path) \
-            or any((re_l1_lang.sub(l, l1_url) == l2_url) for l in more_2letter(options.lang2)) \
-            or any((re_l2_lang.sub(l, l2_url) == l1_url) for l in more_2letter(options.lang1)) \
+            or any((re_l1_lang.sub(l, l1_url) == l2_url) for l in more_codes(options.lang2)) \
+            or any((re_l2_lang.sub(l, l2_url) == l1_url) for l in more_codes(options.lang1)) \
             or (re_sla2.sub("/", re_l1_lang.sub("", l1_url)) == l2_url) \
             or (re_sla2.sub("/", re_l2_lang.sub("", l2_url)) == l1_url):
         return True
@@ -105,13 +105,15 @@ def match_url(l1_url, l2_url):
 
 
 matches = []
-for i, url1 in tqdm(enumerate(l1_urls)):
+for i in tqdm(range(len(l1_urls))):
+    url1 = l1_urls[i]
     for j, url2 in enumerate(l2_urls):
         if match_url(url1, url2):
-            matches.append((i, j))
+            # The index starts at 1 for use with the -n option of sed
+            matches.append((i+1, j+1))
             break
 
 
 for m in matches:
     i, j = m
-    print("{0}\t{1}\t{2}\t{3}".format(l1_urls[i], l2_urls[j], l1_texts[i], l2_texts[j]))
+    print("{0}\t{1}\t{2}\t{3}".format(i, j, l1_texts[i], l2_texts[j]))

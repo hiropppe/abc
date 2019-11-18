@@ -69,7 +69,7 @@ def Embed(tmpdir, ifname, encoder, token_lang, bpe_codes, buffer_size, verbose):
 #
 ###############################################################################
 
-def Mine(src, trg, encoding, src_embeddings, trg_embeddings, output, unify, mode, retrieval, margin, neighborhood, gpu, dim, threshold, verbose):
+def Mine(src_doc_ind, trg_doc_ind, src, trg, encoding, src_embeddings, trg_embeddings, output, unify, mode, retrieval, margin, neighborhood, gpu, dim, threshold, verbose):
     print('LASER: tool to search, score or mine bitexts', file=sys.stderr)
     if gpu:
         print(' - knn will run on all available GPUs (recommended)', file=sys.stderr)
@@ -177,7 +177,7 @@ def Mine(src, trg, encoding, src_embeddings, trg_embeddings, output, unify, mode
                     seen_src.add(src_ind)
                     seen_trg.add(trg_ind)
                     if scores[i] > threshold:
-                        print(src_sents[src_ind], trg_sents[trg_ind], scores[i],
+                        print(src_doc_ind, trg_doc_ind, src_sents[src_ind], trg_sents[trg_ind], scores[i],
                               sep='\t', file=fout)
 
     if fout != sys.stdout:
@@ -232,7 +232,8 @@ def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
     if offset:
         src_sents = [s.strip() for s in open(src)]
         tgt_sents = [t.strip() for t in open(tgt)]
-        doc_offset = [(d[1], d[2], d[4], d[5])
+        # The doc-index starts at 1 for use with the -n option of sed
+        doc_offset = [(int(d[0])+1, d[1], d[2], int(d[3])+1, d[4], d[5])
                       for d in [line.strip().split() for line in open(offset)]]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -243,7 +244,7 @@ def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
 
             src_tmpdir_path.mkdir()
             tgt_tmpdir_path.mkdir()
-            for s_off, s_len, t_off, t_len in doc_offset:
+            for s_ind, s_off, s_len, t_ind, t_off, t_len in doc_offset:
                 src_txt = src_tmpdir_path / 'txt'
                 tgt_txt = tgt_tmpdir_path / 'txt'
 
@@ -269,7 +270,9 @@ def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
 
                 # mine_output = tmpdir_path / "mine"
 
-                Mine(src_txt.__str__(),
+                Mine(s_ind + 1,
+                     t_ind + 1,
+                     src_txt.__str__(),
                      tgt_txt.__str__(),
                      encoding,
                      src_embeddings,

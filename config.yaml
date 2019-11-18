@@ -8,7 +8,10 @@ dataDir: /data/bitextor/data
 moses: /root/mosesdecoder
 mgiza: /root/mgiza
 mkcls: /root/clustercat/bin/mkcls
+
 hunalign: /root/hunalign
+hunalignDic: /data/bitextor/dic_data/hunalign.en-ja.dic
+hunalignThreshold: 0.0
 
 laser_model_dir: /root/LASER/models
 laser_encoder: /root/LASER/models/bilstm.93langs.2018-12-26.pt
@@ -74,9 +77,6 @@ documentAligner: URL
 
 sentenceAligner: LASER
 #sentenceAligner: HUNALIGN
-
-hunalignDic: /data/bitextor/dic_data/hunalign.en-ja.dic
-hunalignThreshold: 0.0
 
 bicleaner: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
 bicleanerThreshold: 0.4

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import lzma
 import subprocess
 import tldextract
 
@@ -21,7 +22,7 @@ def get_lang_or_default_from_dict(scripts_dict, language):
 
 
 def create_domainkey2hosts(hosts):
-    ret={}
+    ret = {}
     for host in hosts:
         # don't merge blog sites
         if host.find(".blogspot.") >= 0 or host.find(".wordpress.") >= 0:
@@ -30,26 +31,26 @@ def create_domainkey2hosts(hosts):
            key = tldextract.extract(host).domain
 
         if key not in ret:
-            ret[key]=[]
+            ret[key] = []
         ret[key].append(host)
-        #print("subdomain", key, host)
+        # print("subdomain", key, host)
     return ret
 
 
 def filter_tld(tlds):
-    filtered_tlds={}
+    filtered_tlds = {}
     if os.path.isfile(f"{PERMANENT_DIR:}/domains.gz"):
         with open_gzip_or_plain(f"{PERMANENT_DIR}/domains.gz") as f:
             for tld in f:
-                tld=tld.strip()
-                filtered_tlds[tld]=tlds[tld]
+                tld = tld.strip()
+                filtered_tlds[tld] = tlds[tld]
         return filtered_tlds
     else:
         return tlds
 
 
 def get_domain_hosts(wildcards):
-    output=[]
+    output = []
     for h in domainkey2hosts[wildcards.target]:
         output.append(f'{DATA_DIR:}/warc/{h:s}/{CRAWLER:s}.warc.gz')
     return output
@@ -166,14 +167,18 @@ else:
 SALIGN = config.get("sentenceAligner", "HUNALIGN").upper()
 if SALIGN == "HUNALIGN":
     SALIGN_SUFFIX = ".hun"
+    MIN_QUALITY = config.get("hunalignThreshold", 0.0)
 elif SALIGN == "LASER":
     SALIGN_SUFFIX = ".lsr"
     LASER_ENCODER = config["laser_encoder"]
     LASER_BPE_CODES = config["laser_bpe_codes"]
     LASER_ENC_PROC = "--enc_gpu" if config.get("laser_enc_gpu", False) else "--enc_cpu"
     LASER_KNN_PROC = "--knn_gpu" if config.get("laser_knn_gpu", False) else "--knn_cpu"
+    MIN_QUALITY = config.get("laser_threshold", 1.1)
 else:
     SALIGN_SUFFIX = ""
+
+MAX_LINES = int(config.get("maxlines", "-1"))
 
 TRAIN_PREFIXES = config.get("initCorpusTrainPrefix")
 
@@ -323,7 +328,7 @@ rule tokenize:
         '{PROFILING} ./scripts/pcm-tokenize.py --text {input} --sentence-splitter "{params.splitter}" --word-tokenizer "{params.tokenizer}" --morph-analyser "{params.lemmatizer}" | xz -c > {output};'
 
 
-# ================================= SIMPLE URL-BASED DOCUMENT ALIGNMENT ================================== #
+# ================================= DOCUMENT ALIGNMENT (SIMPLE URL NORMALIZATION) ================================== #
 
 rule align_doc_by_url:
     input:
@@ -336,7 +341,7 @@ rule align_doc_by_url:
     shell:
         '{PROFILING} ./scripts/pcm-align-documents-by-url.py --lang1 {LANG1} --lang2 {LANG2} --text1 {input[0]} --text2 {input[1]} --url1 {input[2]} --url2 {input[3]} | xz -T 0 > {output}'
 
-# ================================== LASER ALIGNMENT ================================== #
+# ================================== SEGMENT ALIGNMENT (LAZER) ================================== #
 
 rule prepare_laser_mine:
     input:
@@ -356,13 +361,13 @@ rule laser_mine:
         tgt = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}",
         offset = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.offset",
     output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.lsr.xz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.lsr.ind.xz'
     shell:
         '{PROFILING} ./scripts/laser_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
         '  --encoder {LASER_ENCODER} --bpe_codes {LASER_BPE_CODES} {LASER_ENC_PROC}'
         '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_PROC} --output {output}'
 
-# ================================== STRAND ALIGNMENT ================================== #
+# ================================== SEGMENT ALIGNMENT (STRAND + HUNALIGN) ================================== #
 
 rule strand_align:
     input:
@@ -379,10 +384,14 @@ rule strand_align:
         'strand_out=$(mktemp "{TMP_DIR}/strand.align.XXXXXX");'
         'while IFS= read -r line;'
         'do '
-        '  url1=$(echo "$line" | cut -f 1);'
-        '  url2=$(echo "$line" | cut -f 2);'
-        '  n1=$(xzcat -T 0 {input[1]} | grep -n "^$url1$" | head -n 1 | cut -d: -f1);'
-        '  n2=$(xzcat -T 0 {input[2]} | grep -n "^$url2$" | head -n 1 | cut -d: -f1);'
+#        '  url1=$(echo "$line" | cut -f 1);'
+#        '  url2=$(echo "$line" | cut -f 2);'
+        '  n1=$(echo "$line" | cut -f1);'
+        '  n2=$(echo "$line" | cut -f2);'
+        '  url1=$(xzcat -T 0 {input[1]} | sed -n "${{n1}}p");'
+        '  url2=$(xzcat -T 0 {input[2]} | sed -n "${{n2}}p");'
+#        '  n1=$(xzcat -T 0 {input[1]} | grep -n "^$url1$" | head -n 1 | cut -d: -f1);'
+#        '  n2=$(xzcat -T 0 {input[2]} | grep -n "^$url2$" | head -n 1 | cut -d: -f1);'
         '  t1=$(xzcat -T 0 {input[3]} | sed -n "${{n1}}p");'
         '  t2=$(xzcat -T 0 {input[4]} | sed -n "${{n2}}p");'
         '  echo -e "k\t{LANG1}\t$url1\t$t1\t{LANG2}\t$url2\t$t2";'
@@ -401,49 +410,34 @@ rule stranded_hunalign:
         ann = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}.ann',
         bitext = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}',
     output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.srd.hun.xz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.srd.hun.xz.temp'
     shell:
         '{PROFILING} ./scripts/pcm-hunalign-strand.py {input.ann} {input.bitext} -ha {HUNALIGN}/src/hunalign -dic {HUNALIGN_DIC} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" -w1 "{WORDTOK1}" -w2 "{WORDTOK2}" -t {TMP_DIR} | xz -T 0 > {output}'
 
-# ================================== HUNALIGN SEGMENT ALIGNMENT ================================== #
+# ================================== SEGMENT ALIGNMENT (HUNALIGN) ================================== #
 
-"""
+rule prepare_hunalign:
+    input:
+        indices = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz',
+        plain1 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/plain_text.xz',
+        plain2 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/plain_text.xz',
+        tok1 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/plain_tokenized.xz',
+        tok2 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/plain_tokenized.xz',
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.full.xz'
+    shell:
+        'sorted=$(mktemp "{TMP_DIR}/docalign.sorted.XXXXXX");'
+        'xzcat -T 0 {input.indices} | LC_ALL=C sort -nk1 > $sorted;'
+        '{PROFILING} python3 ./scripts/build_docalign.py --indices $sorted --text1 {input.plain1} --text2 {input.plain2} --tokenized1 {input.tok1} --tokenized2 {input.tok2} | xz -T 0 -c > {output};'
+        'rm $sorted'
+
 rule hunalign:
     input:
-        dic = f'{HUNALIGN_DIC}',
-        docalign = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz",
+        docalign = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.full.xz",
     output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.xz'
+        temp(f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.ind.xz')
     shell:
-        'xzcat -T 0 {input.docalign} | {PROFILING} ./scripts/pcm-hunalign-bidoc.py -d {input.dic} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir {HUNALIGN}/src/hunalign --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" | xz -T 0 > {output};'
-"""
-
-rule hunalign_old:
-    input:
-        dic = f'{HUNALIGN_DIC}',
-        docalign = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz",
-        url1 = f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/url.xz",
-        url2 = f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/url.xz",
-        tok1 = f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/plain_tokenized.xz",
-        tok2 = f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/plain_tokenized.xz"
-    output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.xz'
-    shell:
-        'tokenized=$(mktemp "{TMP_DIR}/tokenized.docalign.XXXXXX");'
-        'while IFS= read -r line;'
-        'do url1=$(echo "$line" | cut -f 1);'
-        'url2=$(echo "$line" | cut -f 2);'
-        # TODO: fix bug when same url appears twice
-        # TODO: escape '$'
-        'n1=$(xzcat -T 0 {input.url1} | grep -n "^$url1$" | head -n 1 | cut -d: -f1);'
-        'n2=$(xzcat -T 0 {input.url2} | grep -n "^$url2$" | head -n 1 | cut -d: -f1);'
-        't1=$(xzcat -T 0 {input.tok1} | sed -n "${{n1}}p");'
-        't2=$(xzcat -T 0 {input.tok2} | sed -n "${{n2}}p");'
-        'echo -e "$t1\t$t2";'
-        'done < <(xzcat -T 0 {input[1]}) > $tokenized;'
-        'paste <(xzcat -T 0 {input.docalign}) $tokenized | {PROFILING} ./scripts/pcm-hunalign-bidoc-old.py -d {input.dic} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir "{HUNALIGN}/src/hunalign" --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" | xz -T 0 > {output};'
-
-        'rm $tokenized;'
+        'xzcat -T 0 {input.docalign} | {PROFILING} ./scripts/pcm-hunalign-bidoc.py -d {HUNALIGN_DIC} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir {HUNALIGN}/src/hunalign --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" | xz -T 0 > {output};'
 
 rule hunalign_dic:
     """ Build hunalign dictionary
@@ -467,6 +461,41 @@ rule hunalign_dic:
                         outw.write(columns[1]+" @ "+columns[0]+"\n")
                     else:
                         outw.write(columns[0]+" @ "+columns[1]+"\n")
+
+# ================================== POST SEGMENT ALIGNMENT ================================== #
+
+rule indices2url:
+    input:
+        segalign = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.ind.xz',
+        url1 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/url.xz',
+        url2 = f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/url.xz'
+    output:
+        segalign = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz.temp'
+    run:
+        lang1_dict = {}
+        lang2_dict = {}
+        counter = 1
+        with lzma.open(input.url1, "rt") as url_reader:
+            for line in url_reader:
+                lang1_dict[counter] = line.strip()
+                counter = counter + 1
+        counter = 0
+        with lzma.open(input.url2, "rt") as url_reader:
+            for line in url_reader:
+                lang2_dict[counter] = line.strip()
+                counter = counter + 1
+        with lzma.open(input.segalign, "rt") as reader, lzma.open(output.segalign, "wt") as writer:
+            for line in reader:
+                fields = line.strip().split('\t')
+                writer.write('{}\t{}\t{}\n'.format(lang1_dict[int(fields[0])], lang2_dict[int(fields[1])], "\t".join(fields[2:])))
+
+rule clean_segment:
+    input:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz.temp',
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz',
+    shell:
+        'xzcat -T 0 -f {input} | {PROFILING} ./scripts/clean_segment.py -q {MIN_QUALITY} -m {MAX_LINES} -s | xz -T 0 > {output}'
 
 # ================================= TRAIN BILINGUAL DICTIONARIES ================================= #
 
