@@ -479,7 +479,7 @@ rule indices2url:
             for line in url_reader:
                 lang1_dict[counter] = line.strip()
                 counter = counter + 1
-        counter = 0
+        counter = 1
         with lzma.open(input.url2, "rt") as url_reader:
             for line in url_reader:
                 lang2_dict[counter] = line.strip()

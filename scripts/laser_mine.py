@@ -233,7 +233,7 @@ def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
         src_sents = [s.strip() for s in open(src)]
         tgt_sents = [t.strip() for t in open(tgt)]
         # The doc-index starts at 1 for use with the -n option of sed
-        doc_offset = [(int(d[0])+1, d[1], d[2], int(d[3])+1, d[4], d[5])
+        doc_offset = [(int(d[0]), d[1], d[2], int(d[3]), d[4], d[5])
                       for d in [line.strip().split() for line in open(offset)]]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -270,8 +270,8 @@ def mine(src, tgt, offset, slang, tlang, token_slang, token_tlang,
 
                 # mine_output = tmpdir_path / "mine"
 
-                Mine(s_ind + 1,
-                     t_ind + 1,
+                Mine(s_ind,
+                     t_ind,
                      src_txt.__str__(),
                      tgt_txt.__str__(),
                      encoding,
