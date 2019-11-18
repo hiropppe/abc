@@ -59,7 +59,8 @@ RUN /opt/conda/bin/pip install ipykernel jedi flake8 autopep8 tqdm \
         mmh3==2.5.1 \
         python-pdfextract==1.0.1.2 \
         git+https://github.com/slaveofcode/boilerpipe3.git \
-        pycld2==0.41
+        pycld2==0.41 \
+        attrdict
 
 WORKDIR /root
 

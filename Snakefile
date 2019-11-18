@@ -167,11 +167,11 @@ SALIGN = config.get("sentenceAligner", "HUNALIGN").upper()
 if SALIGN == "HUNALIGN":
     SALIGN_SUFFIX = ".hun"
 elif SALIGN == "LASER":
-    SALIGN_SUFFIX = ".laz"
+    SALIGN_SUFFIX = ".lsr"
     LASER_ENCODER = config["laser_encoder"]
     LASER_BPE_CODES = config["laser_bpe_codes"]
-    LASER_ENC_GPU = "--enc_gpu" if config.get("lazer_enc_gpu", False) else ""
-    LASER_KNN_GPU = "--knn_gpu" if config.get("lazer_knn_gpu", False) else ""
+    LASER_ENC_PROC = "--enc_gpu" if config.get("laser_enc_gpu", False) else "--enc_cpu"
+    LASER_KNN_PROC = "--knn_gpu" if config.get("laser_knn_gpu", False) else "--knn_cpu"
 else:
     SALIGN_SUFFIX = ""
 
@@ -348,19 +348,19 @@ rule prepare_laser_mine:
     params:
         prefix = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}'
     shell:
-        'xzcat -T 0 {input} | {PROFILING} ./scripts/prepare_lazer_mine.py -p {params.prefix} -sl {LANG1} -tl {LANG2} -s1 {SENTTOK1} -s2 {SENTTOK2}'
+        'xzcat -T 0 {input} | {PROFILING} ./scripts/prepare_laser_mine.py -p {params.prefix} -sl {LANG1} -tl {LANG2} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}"'
 
-rule lazer_mine:
+rule laser_mine:
     input:
         src = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG1}",
-        tgt = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}".
-        ann = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.offset",
+        tgt = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}",
+        offset = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.offset",
     output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.laz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.lsr.xz'
     shell:
-        '{PROFILING} ./scripts/lazer_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
-        '  --encoder {LASER_ENCODER} --bpe-codes {LASER_BPE_CODES} {LASER_ENC_CPU}'
-        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_GPU} > {output}'
+        '{PROFILING} ./scripts/laser_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
+        '  --encoder {LASER_ENCODER} --bpe_codes {LASER_BPE_CODES} {LASER_ENC_PROC}'
+        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_PROC} --output {output}'
 
 # ================================== STRAND ALIGNMENT ================================== #
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import click
+import lzma
 import sys
 import base64
 import string
@@ -22,14 +23,17 @@ def write_sentences(b64_text, sent_tokenizer, outfile):
 
 @click.command()
 @click.option("--input", "-i", help="File containing the set of aliged documents")
-@click.option("--prefix", "-p", help="Outpu prefix")
+@click.option("--prefix", "-p", help="Output prefix")
 @click.option("--slang", "-sl", required=True, help="Source language code")
 @click.option("--tlang", "-tl", required=True, help="Source language code")
 @click.option("--sent_tokenizer1", "-s1", required=True, help="Sentence tokenizer for source language")
 @click.option("--sent_tokenizer2", "-s2", required=True, help="Sentence tokenizer for target language")
 def main(input, prefix, slang, tlang, sent_tokenizer1, sent_tokenizer2):
     if input:
-        reader = open(input)
+        if input.endswith(".xz"):
+            reader = lzma.open(input)
+        else:
+            reader = open(input)
     else:
         reader = sys.stdin
 
@@ -41,6 +45,8 @@ def main(input, prefix, slang, tlang, sent_tokenizer1, sent_tokenizer2):
         s_offset = 0
         t_offset = 0
         for line in reader:
+            if isinstance(line, bytes):
+                line = line.decode("utf8")
             fields = line.split("\t")
             url1 = fields[0]
             url2 = fields[1]
