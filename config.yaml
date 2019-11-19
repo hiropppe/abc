@@ -8,6 +8,7 @@ dataDir: /data/bitextor/data
 moses: /root/mosesdecoder
 mgiza: /root/mgiza
 mkcls: /root/clustercat/bin/mkcls
+bicleaner: /root/bicleaner
 
 hunalign: /root/hunalign
 hunalignDic: /data/bitextor/dic_data/hunalign.en-ja.dic
@@ -45,11 +46,12 @@ hosts: ["yotsutake.co.jp"]
 task: [
 #    "build_bidic",
 #    "build_hunalign_dic",
-    "concat",
-    "preprocessing",
-    "align-document",
+    'train_bicleaner',
+#    "concat",
+#    "preprocessing",
+#    "align-document",
     #    "align-paragraph",
-    "align-sentence",
+    #    "align-sentence",
     #    "filtering",
 ]
 
@@ -78,7 +80,7 @@ documentAligner: URL
 sentenceAligner: LASER
 #sentenceAligner: HUNALIGN
 
-bicleaner: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
+bicleanerConfig: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
 bicleanerThreshold: 0.4
 bicleanerCorpusTrainingPrefix: [
     "/data/bitextor/dic_data/GlobalVoices/GlobalVoices.en-jp",

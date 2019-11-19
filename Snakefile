@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
 
+import gzip
 import lzma
 import subprocess
 import tldextract
 
+from func_timeout import func_timeout, FunctionTimedOut
 from pathlib import Path
+from toolwrapper import ToolWrapper
+
+
+def binary_available(cmd):
+    cmd = "command -v " + cmd + " > /dev/null"
+    callout = os.system(cmd)
+    if callout == 0:
+        return True
+    else:
+        return False
+
+
+def tokeniser_check(cmd):
+    proc = ToolWrapper(cmd.split())
+    line = proc.writeline('test.test')
+    try:
+        tokline = func_timeout(5, proc.readline)
+    except FunctionTimedOut:
+        sys.stderr.write("ERROR: tokeniser could not complete within 5 seconds and was terminated. Is it buffering stdout? (if you are using Moses tokeniser, add -b)\n")
+        exit(1)
 
 
 def system_check(cmd):
@@ -26,9 +48,9 @@ def create_domainkey2hosts(hosts):
     for host in hosts:
         # don't merge blog sites
         if host.find(".blogspot.") >= 0 or host.find(".wordpress.") >= 0:
-           key = host
+            key = host
         else:
-           key = tldextract.extract(host).domain
+            key = tldextract.extract(host).domain
 
         if key not in ret:
             ret[key] = []
@@ -71,6 +93,7 @@ PROFILING = ""
 MOSES = Path(config["moses"])
 HUNALIGN = Path(config["hunalign"])
 MGIZA = Path(config["mgiza"])
+BICLEANER = Path(config["bicleaner"])
 
 MKCLS = config.get("mkcls")
 if MKCLS:
@@ -127,6 +150,10 @@ if "plainTextHashes" in config:
 else:
     PLAINTEXTHASHES = ""
 
+if "deduped" in config:
+    DEDUP = '--dedup "seg1,seg2"'
+    BICLEANER_SORT = f"LC_ALL=C sort -t$'\t' -k3,4 -T {TMP_DIR} --compress-program=gzip |"
+
 SENTTOKS = config["sentenceSplitters"]
 SENTTOK1 = get_lang_or_default_from_dict(config["sentenceSplitters"], LANG1)
 SENTTOK2 = get_lang_or_default_from_dict(config["sentenceSplitters"], LANG2)
@@ -182,6 +209,43 @@ MAX_LINES = int(config.get("maxlines", "-1"))
 
 TRAIN_PREFIXES = config.get("initCorpusTrainPrefix")
 
+if "bifixer" in config and config["bifixer"]:
+    BIFIXER = "bifixer"
+    BIFIXERFIELD = ",bifixerhash,bifixerscore"
+    BICLEANER_SORT = ""
+    DEDUP = '--dedup "bifixerhash"'
+    CACHEOPTIONS = '-k 6,7'
+else:
+    BIFIXER = "segclean"
+    BIFIXERFIELD = ""
+    CACHEOPTIONS = '-k 3,4'
+
+if "bifixerOptions" in config:
+    BIFIXEROPTIONS = config["bifixerOptions"]
+else:
+    BIFIXEROPTIONS = "--aggressive_dedup"
+
+if "bicleanerConfig" in config:
+    RAWOPTION = "bicleaner.scores"
+    BICLEANEROPTION = ",bicleaner"
+    BICLEANER_CONFIG = config["bicleanerConfig"]
+    FILTER = "bicleaner"
+    tokeniser_check(WORDTOK1)
+    tokeniser_check(WORDTOK2)
+else:
+    RAWOPTION = "segclean"
+    BICLEANEROPTION = ""
+    if BIFIXER:
+        FILTER = "bifixer"
+    else:
+        FILTER = "segclean"
+    BICLEANER_CONFIG = ""
+
+if "bicleanerThreshold" in config:
+    BICLEANER_THRESHOLD = config["bicleanerThreshold"]
+else:
+    BICLEANER_THRESHOLD = 0.0
+
 PPROC_CORPUS_DIR = f"{TRANSIENT_DIR}/tempcorpuspreproc.{LANG1}-{LANG2}"
 MGIZA_MODEL_DIR = f"{TRANSIENT_DIR}/tempgizamodel.{LANG1}-{LANG2}"
 
@@ -232,6 +296,10 @@ if "build_bidic" in TASK_LIST:
 
 if "build_hunalign_dic" in TASK_LIST:
     BUILD_OUTPUT.append(HUNALIGN_DIC)
+
+if "train_bicleaner" in TASK_LIST:
+    BUILD_OUTPUT.append(BICLEANER_CONFIG)
+    BICLEANER_TRAIN_PREFIXES = config.get("bicleanerCorpusTrainingPrefix")
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
@@ -585,7 +653,7 @@ rule mgiza:
     output:
         "{prefix}.{l2}-{l1}.t3.final"
     shell:
-        "{PROFILING} {MGIZA}/mgizapp/bin/mgiza -ncpus 8 -CoocurrenceFile {input.cooc} -c {input.snt} -m1 5 -m2 0 -m3 3 -m4 3 -mh 5 -m5 0 -model1dumpfrequency 1 -o {wildcards.prefix}.{wildcards.l2}-{wildcards.l1} -s {input.vcb1} -t {input.vcb2} -emprobforempty 0.0 -probsmooth 1e-7 2> /dev/null > /dev/null"
+        "{PROFILING} {MGIZA}/mgizapp/bin/mgiza -ncpus 16 -CoocurrenceFile {input.cooc} -c {input.snt} -m1 5 -m2 0 -m3 3 -m4 3 -mh 5 -m5 0 -model1dumpfrequency 1 -o {wildcards.prefix}.{wildcards.l2}-{wildcards.l1} -s {input.vcb1} -t {input.vcb2} -emprobforempty 0.0 -probsmooth 1e-7 2> /dev/null > /dev/null"
 
 rule filter_dics:
     input:
@@ -651,3 +719,73 @@ rule symmetrise_dic:
         t3t.close()
         dic.close()
         os.sync()
+
+# ================================= TRAIN BILINGUAL DICTIONARIES ================================= #
+rule lex_dic:
+    """ Obtaining the harmonic probability of each pair of words in both directions and filtering out those with less than p=0.2; printing the dictionary
+    """
+    input:
+        vcb1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}.filtered.vcb",
+        vcb2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}.filtered.vcb",
+        t3_1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}-{LANG2}.t3.final",
+        t3_2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}-{LANG1}.t3.final"
+    output:
+        e2f = "{DIC}.lex.e2f.gz",
+        f2e = "{DIC}.lex.f2e.gz"
+    run:
+        svocabulary = {}
+        tvocabulary = {}
+        svcb = open(input.vcb1, "r")
+        tvcb = open(input.vcb2, "r")
+        for line in svcb:
+            item = line.strip().split(" ")
+            svocabulary[item[0]] = item[1]
+
+        for line in tvcb:
+            item = line.strip().split(" ")
+            tvocabulary[item[0]] = item[1]
+
+        t3s = open(input.t3_1, "r")
+        t3t = open(input.t3_2, "r")
+        dice2f = gzip.open(output[0], "wt")
+        dicf2e = gzip.open(output[1], "wt")
+
+        for line in t3t:
+            item = line.strip().split(" ")
+            value = float(item[2])
+            if value > 0.1:
+                if item[0] in svocabulary and item[1] in tvocabulary:
+                    dice2f.write("{0} {1} {2}\n".format(svocabulary[item[0]], tvocabulary[item[1]], item[2]))
+
+        for line in t3s:
+            item = line.strip().split(" ")
+            value = float(item[2])
+            if value > 0.1:
+                if item[1] in svocabulary and item[0] in tvocabulary:
+                    dicf2e.write("{0} {1} {2}\n".format(tvocabulary[item[0]], svocabulary[item[1]], item[2]))
+        svcb.close()
+        tvcb.close()
+        t3s.close()
+        t3t.close()
+        dice2f.close()
+        dicf2e.close()
+        os.sync()
+
+rule train_bicleaner:
+    input:
+        corpusl1 = expand("{dataset}.{lang}.xz", dataset=BICLEANER_TRAIN_PREFIXES, lang=LANG1),
+        corpusl2 = expand("{dataset}.{lang}.xz", dataset=BICLEANER_TRAIN_PREFIXES, lang=LANG2),
+        e2f = f"{DIC}.lex.e2f.gz",
+        f2e = f"{DIC}.lex.f2e.gz"
+    output:
+        f"{BICLEANER_CONFIG}"
+    shell:
+        "training=$(mktemp {TMP_DIR}/train.XXXXXXXX); "
+        "paste <(xzcat -f {input.corpusl1}) <(xzcat -f {input.corpusl2}) > $training; "
+        "DIR=$(dirname {BICLEANER_CONFIG}); "
+        "echo $DIR; "
+        "lines=$(cat $training | wc -l); "
+        "trainlines=$(echo \"$lines*4/10\" | bc); "
+        "testlines=$(echo \"($lines-2*$trainlines)/2\" | bc); "
+        '{PROFILING} python3  {BICLEANER}/bicleaner/bicleaner_train.py $training -S "{WORDTOK1}" -T "{WORDTOK2}" --treat_oovs --normalize_by_length -s {LANG1} -t {LANG2} -d {input.e2f} -D {input.f2e} -c $DIR/{LANG1}-{LANG2}.classifier -g $trainlines -w $trainlines --good_test_examples $testlines --wrong_test_examples $testlines -m {BICLEANER_CONFIG} --classifier_type random_forest; '
+        "rm $training"

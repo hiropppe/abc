@@ -17,7 +17,7 @@ RUN apt-get update \
 
 RUN apt-get update && \
     apt-get install -y software-properties-common build-essential cmake pkg-config \
-        vim wget bzip2 unzip less tree \
+        vim wget bzip2 unzip less tree bc \
         libboost-all-dev liblzma-dev liblbfgs-dev \
         openjdk-8-jdk pdftohtml \
         zlib1g-dev libbz2-dev \
@@ -60,6 +60,7 @@ RUN /opt/conda/bin/pip install ipykernel jedi flake8 autopep8 tqdm \
         python-pdfextract==1.0.1.2 \
         git+https://github.com/slaveofcode/boilerpipe3.git \
         pycld2==0.41 \
+        func_timeout==4.3.5 \
         attrdict
 
 WORKDIR /root
@@ -81,7 +82,8 @@ RUN git clone https://github.com/moses-smt/mosesdecoder.git && \
     cd mosesdecoder && ./bjam -j4
 
 RUN git clone https://github.com/moses-smt/mgiza.git && \
-    cd mgiza/mgizapp && git checkout 3dd8ef6 && cmake . && make
+    cd mgiza/mgizapp && git checkout 3dd8ef6 && cmake . && make && \
+    cp ../experimental/alignment-enabled/MGIZA/scripts/merge_alignment.py ./bin/
 
 RUN git clone https://github.com/bitextor/hunalign.git && \
     cd hunalign/src/hunalign && git checkout 8235ea2 && make
@@ -91,6 +93,15 @@ RUN git clone https://github.com/kpu/preprocess.git && \
 
 RUN git clone https://github.com/jonsafari/clustercat.git && \
     cd clustercat && git checkout b19f171 && make -j4
+
+RUN git clone https://github.com/kpu/kenlm && \
+    cd kenlm && mkdir build && cd build && cmake .. -DKENLM_MAX_ORDER=7 && make -j all install
+
+RUN git clone https://github.com/bitextor/bicleaner.git && \
+    cd bicleaner && git checkout c55f1f2 && python setup.py install
+
+RUN git clone https://github.com/bitextor/bifixer.git && \
+    /opt/conda/bin/pip install unidecode xxhash
 
 ENV PATH /opt/conda/bin:$PATH
 RUN git clone https://github.com/hiropppe/strand-aligner.git && \
