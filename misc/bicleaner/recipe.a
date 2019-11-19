@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+import gzip
+
+LANG1 = "en"
+LANG2 = "ja"
+
+MOSES = "/root/mosesdecoder"
+MGIZA = "/root/mgiza"
+MKCLS = "/root/mgiza/mgizapp/bin/mkcls"
+BICLEANER = "/root/bicleaner"
+
+PPROC_CORPUS_DIR = "pproc"
+MGIZA_MODEL_DIR = "mgiza"
+TMP_DIR = "/tmp"
+
+PROFILING = ""
+
+WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
+WORDTOK2 = "mecab -Owakati"
+
+DICT_CORPUS_PREFIXES = [
+    "GlobalVoices"
+]
+
+BICLEANER_CORPUS_PREFIXES = [
+    "GlobalVoices"
+]
+
+DIC = f"{LANG1}-{LANG2}.dic"
+BICLEANER_CONFIG = f"{LANG1}-{LANG2}.yaml"
+
+OUTPUT = [
+    BICLEANER_CONFIG
+]
+
+rule all:
+    input:
+        expand("{target}", target=OUTPUT)
+
+# ================================= TRAIN BICLEANER ================================= #
+
+rule tokenize_file_l1:
+    input:
+        expand("{dataset}.{lang1}-{lang2}.{lang1}.xz", dataset=DICT_CORPUS_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        f"{{dir}}/corpus.tok.{LANG1}.xz"
+    shell:
+        "mkdir -p {wildcards.dir}; "
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK1} | xz -T 0 > {output}"
+
+rule tokenize_file_l2:
+    input:
+        expand("{dataset}.{lang1}-{lang2}.{lang2}.xz", dataset=DICT_CORPUS_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        f"{{dir}}/corpus.tok.{LANG2}.xz"
+    shell:
+        "mkdir -p {wildcards.dir}; "
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK2} | xz -T 0 > {output}"
+
+rule lowercase:
+    input:
+        "{prefix}.tok.{lang}.xz"
+    output:
+        "{prefix}.tok.low.{lang}"
+    shell:
+        "xzcat {input} | {MOSES}/scripts/tokenizer/lowercase.perl > {output}"
+
+rule clean:
+    input:
+        f"{{prefix}}.tok.low.{LANG1}",
+        f"{{prefix}}.tok.low.{LANG2}"
+    output:
+        f"{{prefix}}.clean.{LANG1}",
+        f"{{prefix}}.clean.{LANG2}"
+    shell:
+        "{PROFILING} perl {MOSES}/scripts/training/clean-corpus-n.perl {wildcards.prefix}.tok.low {LANG1} {LANG2} {wildcards.prefix}.clean 1 80 {wildcards.prefix}.lines-retained"
+
+rule plain2snt:
+    input:
+        l1 = f"{PPROC_CORPUS_DIR}/corpus.clean.{LANG1}",
+        l2 = f"{PPROC_CORPUS_DIR}/corpus.clean.{LANG2}"
+    output:
+        snt_2_1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}-{LANG1}-int-train.snt",
+        snt_1_2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}-{LANG2}-int-train.snt",
+        vcb1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}.vcb",
+        vcb2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}.vcb"
+    priority:
+        40
+    shell:
+        "mkdir -p {MGIZA_MODEL_DIR}; "
+        "{MGIZA}/mgizapp/bin/plain2snt {input.l1} {input.l2} 2> /dev/null > /dev/null; "
+        "mv {PPROC_CORPUS_DIR}/corpus.clean.{LANG1}_corpus.clean.{LANG2}.snt {output.snt_2_1}; "
+        "mv {PPROC_CORPUS_DIR}/corpus.clean.{LANG2}_corpus.clean.{LANG1}.snt {output.snt_1_2}; "
+        "cp {PPROC_CORPUS_DIR}/corpus.clean.{LANG1}.vcb {output.vcb1}; "
+        "cp {PPROC_CORPUS_DIR}/corpus.clean.{LANG2}.vcb {output.vcb2}; "
+
+rule mkcls:
+    input:
+        f"{PPROC_CORPUS_DIR}/corpus.clean.{{lang}}"
+    output:
+        f"{MGIZA_MODEL_DIR}/corpus.{{lang}}.vcb.classes"
+    priority:
+        40
+    shell:
+        "{PROFILING} {MKCLS} -c50 -n2 -p{input} -V{output} opt 2> /dev/null > /dev/null"
+
+rule snt2cooc:
+    input:
+        vcb1 = "{prefix}.{l1}.vcb",
+        vcb2 = "{prefix}.{l2}.vcb",
+        vcb1cls = "{prefix}.{l1}.vcb.classes",
+        vcb2cls = "{prefix}.{l2}.vcb.classes",
+        snt = "{prefix}.{l2}-{l1}-int-train.snt"
+    output:
+        "{prefix}.{l2}-{l1}.cooc"
+    shell:
+        "{PROFILING} {MGIZA}/mgizapp/bin/snt2cooc {output} {input.vcb1} {input.vcb2} {input.snt} 2> /dev/null"
+
+rule mgiza:
+    input:
+        vcb1 = "{prefix}.{l1}.vcb",
+        vcb2 = "{prefix}.{l2}.vcb",
+        snt = "{prefix}.{l2}-{l1}-int-train.snt",
+        cooc = "{prefix}.{l2}-{l1}.cooc"
+    output:
+        "{prefix}.{l2}-{l1}.t3.final"
+    shell:
+        "{PROFILING} {MGIZA}/mgizapp/bin/mgiza -ncpus 16 -CoocurrenceFile {input.cooc} -c {input.snt} -m1 5 -m2 0 -m3 3 -m4 3 -mh 5 -m5 0 -model1dumpfrequency 1 -o {wildcards.prefix}.{wildcards.l2}-{wildcards.l1} -s {input.vcb1} -t {input.vcb2} -emprobforempty 0.0 -probsmooth 1e-7 2> /dev/null > /dev/null"
+
+rule filter_dics:
+    input:
+        "{prefix}.vcb"
+    output:
+        "{prefix}.filtered.vcb"
+    shell:
+        "cat {input} | egrep ' [^ ][^ ]+$' > {output}"
+
+
+rule lex_dic:
+    """ Obtaining the harmonic probability of each pair of words in both directions and filtering out those with less than p=0.2; printing the dictionary
+    """
+    input:
+        vcb1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}.filtered.vcb",
+        vcb2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}.filtered.vcb",
+        t3_1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}-{LANG2}.t3.final",
+        t3_2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}-{LANG1}.t3.final"
+    output:
+        e2f = "{DIC}.lex.e2f.gz",
+        f2e = "{DIC}.lex.f2e.gz"
+    run:
+        svocabulary = {}
+        tvocabulary = {}
+        svcb = open(input.vcb1, "r")
+        tvcb = open(input.vcb2, "r")
+        for line in svcb:
+            item = line.strip().split(" ")
+            svocabulary[item[0]] = item[1]
+
+        for line in tvcb:
+            item = line.strip().split(" ")
+            tvocabulary[item[0]] = item[1]
+
+        t3s = open(input.t3_1, "r")
+        t3t = open(input.t3_2, "r")
+        dice2f = gzip.open(output[0], "wt")
+        dicf2e = gzip.open(output[1], "wt")
+
+        for line in t3t:
+            item = line.strip().split(" ")
+            value = float(item[2])
+            if value > 0.1:
+                if item[0] in svocabulary and item[1] in tvocabulary:
+                    dice2f.write("{0} {1} {2}\n".format(svocabulary[item[0]], tvocabulary[item[1]], item[2]))
+
+        for line in t3s:
+            item = line.strip().split(" ")
+            value = float(item[2])
+            if value > 0.1:
+                if item[1] in svocabulary and item[0] in tvocabulary:
+                    dicf2e.write("{0} {1} {2}\n".format(tvocabulary[item[0]], svocabulary[item[1]], item[2]))
+        svcb.close()
+        tvcb.close()
+        t3s.close()
+        t3t.close()
+        dice2f.close()
+        dicf2e.close()
+        os.sync()
+
+rule train_bicleaner:
+    input:
+        corpusl1 = expand(f"{{dataset}}.{LANG1}-{LANG2}.{LANG1}.xz", dataset=BICLEANER_CORPUS_PREFIXES),
+        corpusl2 = expand(f"{{dataset}}.{LANG1}-{LANG2}.{LANG2}.xz", dataset=BICLEANER_CORPUS_PREFIXES),
+        e2f = f"{DIC}.lex.e2f.gz",
+        f2e = f"{DIC}.lex.f2e.gz"
+    output:
+        f"{BICLEANER_CONFIG}"
+    shell:
+        "training=$(mktemp {TMP_DIR}/train.XXXXXXXX); "
+        "paste <(xzcat -f {input.corpusl1}) <(xzcat -f {input.corpusl2}) > $training; "
+        "DIR=$(dirname {BICLEANER_CONFIG}); "
+        "echo $DIR; "
+        "lines=$(cat $training | wc -l); "
+        "trainlines=$(echo \"$lines*4/10\" | bc); "
+        "testlines=$(echo \"($lines-2*$trainlines)/2\" | bc); "
+        '{PROFILING} python3  {BICLEANER}/bicleaner/bicleaner_train.py $training -S "{WORDTOK1}" -T "{WORDTOK2}" --treat_oovs --normalize_by_length -s {LANG1} -t {LANG2} -d {input.e2f} -D {input.f2e} -c $DIR/{LANG1}-{LANG2}.classifier -g $trainlines -w $trainlines --good_test_examples $testlines --wrong_test_examples $testlines -m {BICLEANER_CONFIG} --classifier_type random_forest; '
+        "rm $training"

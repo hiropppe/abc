@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+
+LANG1 = "en"
+LANG2 = "ja"
+
+MOSES = "/root/mosesdecoder"
+MGIZA = "/root/mgiza"
+MKCLS = "/root/mgiza/mgizapp/bin/mkcls"
+BIFIXER = "/root/bifixer"
+BICLEANER = "/root/bicleaner"
+
+PPROC_CORPUS_DIR = "pproc"
+MOSES_MODEL_DIR = "model"
+
+PROFILING = ""
+
+WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
+WORDTOK2 = "mecab -Owakati"
+
+DICT_CORPUS_PREFIXES = [
+    "GlobalVoices"
+]
+
+BICLEANER_CORPUS_PREFIXES = [
+    "GlobalVoices"
+]
+
+DIC = f"{LANG1}-{LANG2}.dic"
+BICLEANER_CLASSIFIER = f"{LANG1}-{LANG2}.classifier"
+BICLEANER_CONFIG = f"{LANG1}-{LANG2}.yaml"
+
+OUTPUT = [
+    BICLEANER_CONFIG,
+    BICLEANER_CLASSIFIER
+]
+
+rule all:
+    input:
+        expand("{target}", target=OUTPUT)
+
+# ================================= TRAIN BICLEANER ================================= #
+
+# /root/mosesdecoder/scripts/tokenizer/tokenizer.perl -l en < dictcorpus.en-ja.en > dictcorpus.en-ja.tok.en 
+rule tokenize_file_l1:
+    input:
+        expand("{dataset}.{lang1}-{lang2}.{lang1}.xz", dataset=DICT_CORPUS_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        f"{{dir}}/corpus.tok.{LANG1}.xz"
+    shell:
+        "mkdir -p {wildcards.dir}; "
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK1} | xz -T 0 > {output}"
+
+# mecab -Owakati < dictcorpus.en-ja.ja > dictcorpus.en-ja.tok.ja
+rule tokenize_file_l2:
+    input:
+        expand("{dataset}.{lang1}-{lang2}.{lang2}.xz", dataset=DICT_CORPUS_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        f"{{dir}}/corpus.tok.{LANG2}.xz"
+    shell:
+        "mkdir -p {wildcards.dir}; "
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK2} | xz -T 0 > {output}"
+
+# tr '[:upper:]' '[:lower:]' < dictcorpus.en-ja.tok.en > dictcorpus.en-ja.tok.low.en
+# tr '[:upper:]' '[:lower:]' < dictcorpus.en-ja.tok.ja > dictcorpus.en-ja.tok.low.ja
+rule lowercase:
+    input:
+        "{prefix}.tok.{lang}.xz"
+    output:
+        "{prefix}.tok.low.{lang}"
+    shell:
+        "xzcat {input} | {MOSES}/scripts/tokenizer/lowercase.perl > {output}"
+
+# mv dictcorpus.en-ja.tok.low.en dictcorpus.en-ja.clean.en
+# mv dictcorpus.en-ja.tok.low.ja dictcorpus.en-ja.clean.ja
+rule clean:
+    input:
+        f"{{prefix}}.tok.low.{LANG1}",
+        f"{{prefix}}.tok.low.{LANG2}"
+    output:
+        f"{{prefix}}.clean.{LANG1}",
+        f"{{prefix}}.clean.{LANG2}"
+    shell:
+        "{PROFILING} perl {MOSES}/scripts/training/clean-corpus-n.perl {wildcards.prefix}.tok.low {LANG1} {LANG2} {wildcards.prefix}.clean 1 80 {wildcards.prefix}.lines-retained"
+
+# /root/mosesdecoder/scripts/training/train-model.perl --alignment grow-diag-final-and --root-dir /data/bitextor/bicleaner/moses_ver --corpus dictcorpus.en-ja.clean -e en -f ja --mgiza -mgiza-cpus=16 --parallel --first-step 1 --last-step 4 --external-bin-dir /root/mgiza/mgizapp/bin
+rule moses:
+    input:
+        f"{PPROC_CORPUS_DIR}/corpus.clean.{LANG1}",
+        f"{PPROC_CORPUS_DIR}/corpus.clean.{LANG2}"
+    output:
+        f"{MOSES_MODEL_DIR}/lex.e2f",
+        f"{MOSES_MODEL_DIR}/lex.f2e"
+    shell:
+        '{MOSES}/scripts/training/train-model.perl --alignment grow-diag-final-and --root-dir . --corpus {PPROC_CORPUS_DIR}/corpus.clean -e en -f ja --mgiza -mgiza-cpus=16 --parallel --first-step 1 --last-step 4 --external-bin-dir {MGIZA}/mgizapp/bin'
+
+# awk '{print $2" " $1" " $3}' model/lex.e2f > model/lex.e2f_2 && mv model/lex.e2f_2 model/lex.e2f && awk '{print $2" " $1" " $3}' model/lex.f2e > model/lex.f2e_2 && mv model/lex.f2e_2 model/lex.f2e
+# gzip model/lex.e2f -c > dict-en.gz
+# gzip model/lex.f2e -c > dict-ja.gz
+rule swap_lex:
+    input:
+        f"{MOSES_MODEL_DIR}/lex.e2f",
+        f"{MOSES_MODEL_DIR}/lex.f2e"
+    output:
+        dict1 = f"{MOSES_MODEL_DIR}/{LANG1}-{LANG2}.lex.e2f",
+        dict2 = f"{MOSES_MODEL_DIR}/{LANG1}-{LANG2}.lex.f2e"
+    shell:
+        'cd {MOSES_MODEL_DIR};'
+        'awk \'{{print $2" " $1" " $3}}\' lex.e2f > lex.e2f_2 && mv lex.e2f_2 {LANG1}-{LANG2}.lex.e2f && awk \'{{print $2" " $1" " $3}}\' lex.f2e > lex.f2e_2 && mv lex.f2e_2 {LANG1}-{LANG2}.lex.f2e;'
+
+# python /root/bicleaner/utils/dict_pruner.py model/lex.e2f dict-en.gz -n 10 -g
+# python /root/bicleaner/utils/dict_pruner.py model/lex.f2e dict-ja.gz -n 10 -g
+rule prune_dict:
+    input:
+        f"{MOSES_MODEL_DIR}/{LANG1}-{LANG2}.lex.e2f",
+        f"{MOSES_MODEL_DIR}/{LANG1}-{LANG2}.lex.f2e"
+    output:
+        dict1 = f"{LANG1}-{LANG2}.lex.e2f.gz",
+        dict2 = f"{LANG1}-{LANG2}.lex.f2e.gz"
+    shell:
+        'python {BICLEANER}/utils/dict_pruner.py {MOSES_MODEL_DIR}/lex.e2f {output.dict1} -n 10 -g;'
+        'python {BICLEANER}/utils/dict_pruner.py {MOSES_MODEL_DIR}/lex.f2e {output.dict2} -n 10 -g;'
+
+# cat ../GlobalVoices.en-ja.en > corpus.en-ja.en
+# cat ../GlobalVoices.en-ja.ja > corpus.en-ja.ja
+# paste corpus.en-ja.en corpus.en-ja.ja > corpus.en-ja
+rule bicleaner_corpus:
+    input:
+        corpusl1 = expand(f"{{dataset}}.{LANG1}-{LANG2}.{LANG1}.xz", dataset=BICLEANER_CORPUS_PREFIXES),
+        corpusl2 = expand(f"{{dataset}}.{LANG1}-{LANG2}.{LANG2}.xz", dataset=BICLEANER_CORPUS_PREFIXES),
+    output:
+        f"corpus.{LANG1}-{LANG2}"
+    shell:
+        "paste <(xzcat -f {input.corpusl1}) <(xzcat -f {input.corpusl2}) > {output}; "
+
+# python /root/bifixer/bifixer/bifixer.py --scol 1 --tcol 2 --ignore_duplicates corpus.en-ja corpus.en-ja.bifixed en ja
+rule bifixer:
+    input:
+        f"corpus.{LANG1}-{LANG2}"
+    output:
+        f"corpus.{LANG1}-{LANG2}.bifixed"
+    shell:
+        'python {BIFIXER}/bifixer/bifixer.py --scol 1 --tcol 2 --ignore_duplicates corpus.en-ja {output} {LANG1} {LANG2}'
+
+# python /root/bicleaner/bicleaner/bicleaner_hardrules.py corpus.en-ja.bifixed corpus.en-ja.annotated -s en -t ja --scol 1 --tcol 2 --annotated_output
+# cat corpus.en-ja.annotated | grep "keep$" | shuf -n 100000 | cut -f1,2 > train.en-ja
+rule bicleaner_hardrule:
+    input:
+        f"corpus.{LANG1}-{LANG2}.bifixed"
+    output:
+        f"train.{LANG1}-{LANG2}"
+    shell:
+        'python {BICLEANER}/bicleaner/bicleaner_hardrules.py corpus.en-ja.bifixed corpus.en-ja.annotated -s en -t ja --scol 1 --tcol 2 --annotated_output;'
+        'cat corpus.en-ja.annotated | grep "keep$" | shuf -n 100000 | cut -f1,2 > {output};'
+
+# python /root/bicleaner/bicleaner/bicleaner_train.py \
+#     train.en-ja \
+#     --treat_oovs --normalize_by_length \
+#     -s en -t ja \
+#     -d dict-en.gz -D dict-ja.gz \
+#     -b 1000 -c en-ja.classfier \
+#     -g 20000 -w 20000 -m en-ja.yaml \
+#     --classifier_type random_forest \
+#     --lm_training_file_sl lmtrain.en-ja.en \
+#     --lm_training_file_tl lmtrain.en-ja.ja \
+#     --lm_file_sl model.en-ja.en \
+#     --lm_file_tl model.en-ja.ja
+rule train_bicleaner:
+    input:
+        dict1 = f"{LANG1}-{LANG2}.lex.e2f.gz",
+        dict2 = f"{LANG1}-{LANG2}.lex.f2e.gz",
+        corpus = f"train.{LANG1}-{LANG2}"
+    output:
+        classfier = BICLEANER_CLASSIFIER,
+        config = BICLEANER_CONFIG
+    shell:
+        'python /root/bicleaner/bicleaner/bicleaner_train.py'
+        '    train.en-ja'
+        '    --treat_oovs --normalize_by_length'
+        '    -s {LANG1} -t {LANG2}'
+        '    -d {input.dict1} -D {input.dict2}'
+        '    -b 1000 -c {output.classfier}'
+        '    -g 20000 -w 20000 -m {output.config}'
+        '    --classifier_type random_forest'
+        '    --lm_training_file_sl lmtrain.{LANG1}-{LANG2}.{LANG1}'
+        '    --lm_training_file_tl lmtrain.{LANG1}-{LANG2}.{LANG2}'
+        '    --lm_file_sl model.{LANG1}-{LANG2}.{LANG1}'
+        '    --lm_file_tl model.{LANG1}-{LANG2}.{LANG2}'

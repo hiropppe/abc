@@ -98,7 +98,8 @@ RUN git clone https://github.com/kpu/kenlm && \
     cd kenlm && mkdir build && cd build && cmake .. -DKENLM_MAX_ORDER=7 && make -j all install
 
 RUN git clone https://github.com/bitextor/bicleaner.git && \
-    cd bicleaner && git checkout c55f1f2 && python setup.py install
+    cd bicleaner && git checkout bicleaner-0.13 && python setup.py install && \
+    /opt/conda/bin/pip install mosestokenizer toolwrapper regex
 
 RUN git clone https://github.com/bitextor/bifixer.git && \
     /opt/conda/bin/pip install unidecode xxhash
