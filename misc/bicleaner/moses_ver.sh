@@ -16,6 +16,7 @@ mv dictcorpus.en-ja.tok.low.ja dictcorpus.en-ja.clean.ja
 
 #cp /root/mgiza/experimental/alignment-enabled/MGIZA/scripts/merge_alignment.py /root/mgiza/mgizapp/bin/
 /root/mosesdecoder/scripts/training/train-model.perl --alignment grow-diag-final-and --root-dir /data/bitextor/bicleaner/moses_ver --corpus dictcorpus.en-ja.clean -e en -f ja --mgiza -mgiza-cpus=16 --parallel --first-step 1 --last-step 4 --external-bin-dir /root/mgiza/mgizapp/bin
+awk '{print $2" " $1" " $3}' model/lex.e2f > model/lex.e2f_2 && mv model/lex.e2f_2 model/lex.e2f && awk '{print $2" " $1" " $3}' model/lex.f2e > model/lex.f2e_2 && mv model/lex.f2e_2 model/lex.f2e
 gzip model/lex.e2f -c > dict-en.gz
 gzip model/lex.f2e -c > dict-ja.gz
 

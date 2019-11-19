@@ -36,8 +36,8 @@ cat ./mgiza/corpus.ja.vcb | egrep ' [^ ][^ ]+$' > mgiza/corpus.ja.filtered.vcb
 
 python ../lex_dic.py mgiza/corpus.en.filtered.vcb mgiza/corpus.ja.filtered.vcb mgiza/corpus.en-ja.t3.final mgiza/corpus.ja-en.t3.final lex.e2f.gz lex.f2e.gz
 
-cat ../GlobalVoices.en-ja.ja > train.en-ja.ja
-cat ../GlobalVoices.en-ja.en > train.en-ja.en 
+cat ../GlobalVoices.en-ja.ja > corpus.en-ja.ja
+cat ../GlobalVoices.en-ja.en > corpus.en-ja.en 
 paste corpus.en-ja.en corpus.en-ja.ja > train.en-ja
 lines=$(cat train.en-ja | wc -l)
 trainlines=$(echo "$lines*4/10" | bc);
