@@ -104,6 +104,12 @@ RUN git clone https://github.com/bitextor/bicleaner.git && \
 RUN git clone https://github.com/bitextor/bifixer.git && \
     /opt/conda/bin/pip install unidecode xxhash
 
+RUN git clone https://github.com/hainan-xv/zipporah.git && \
+    cd zipporah && ./make.sh
+
+RUN git clone https://github.com/clab/fast_align.git && \
+    cd fast_align && mkdir build && cd build && cmake .. && make
+
 ENV PATH /opt/conda/bin:$PATH
 RUN git clone https://github.com/hiropppe/strand-aligner.git && \
     cd strand-aligner && make && make install
