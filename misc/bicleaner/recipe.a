@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import gzip
 
 LANG1 = "en"
@@ -19,14 +20,17 @@ WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
 WORDTOK2 = "mecab -Owakati"
 
 DICT_CORPUS_PREFIXES = [
-    "GlobalVoices"
+    "OpenSubtitles",
+    "Tatoeba",
 ]
 
 BICLEANER_CORPUS_PREFIXES = [
-    "GlobalVoices"
+    "GlobalVoices",
+    "EUbookshop"
 ]
 
 DIC = f"{LANG1}-{LANG2}.dic"
+BICLEANER_CLASSIFIER = f"{LANG1}-{LANG2}.classifier"
 BICLEANER_CONFIG = f"{LANG1}-{LANG2}.yaml"
 
 OUTPUT = [
@@ -193,7 +197,8 @@ rule train_bicleaner:
         e2f = f"{DIC}.lex.e2f.gz",
         f2e = f"{DIC}.lex.f2e.gz"
     output:
-        f"{BICLEANER_CONFIG}"
+        classfier = BICLEANER_CLASSIFIER,
+        config = BICLEANER_CONFIG
     shell:
         "training=$(mktemp {TMP_DIR}/train.XXXXXXXX); "
         "paste <(xzcat -f {input.corpusl1}) <(xzcat -f {input.corpusl2}) > $training; "
@@ -202,5 +207,16 @@ rule train_bicleaner:
         "lines=$(cat $training | wc -l); "
         "trainlines=$(echo \"$lines*4/10\" | bc); "
         "testlines=$(echo \"($lines-2*$trainlines)/2\" | bc); "
-        '{PROFILING} python3  {BICLEANER}/bicleaner/bicleaner_train.py $training -S "{WORDTOK1}" -T "{WORDTOK2}" --treat_oovs --normalize_by_length -s {LANG1} -t {LANG2} -d {input.e2f} -D {input.f2e} -c $DIR/{LANG1}-{LANG2}.classifier -g $trainlines -w $trainlines --good_test_examples $testlines --wrong_test_examples $testlines -m {BICLEANER_CONFIG} --classifier_type random_forest; '
-        "rm $training"
+
+        '{PROFILING} python3 {BICLEANER}/bicleaner/bicleaner_train.py $training'
+        '-S "{WORDTOK1}" -T "{WORDTOK2}"'
+        '--treat_oovs --normalize_by_length'
+        '-s {LANG1} -t {LANG2}'
+        '-d {input.e2f} -D {input.f2e}'
+        '-c {output.classfier}'
+        '-g $trainlines -w $trainlines'
+        '--good_test_examples $testlines --wrong_test_examples $testlines'
+        '-m {output.config}'
+        '--classifier_type random_forest; '
+
+        'rm $training;'

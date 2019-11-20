@@ -18,11 +18,13 @@ WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
 WORDTOK2 = "mecab -Owakati"
 
 DICT_CORPUS_PREFIXES = [
-    "GlobalVoices"
+    "OpenSubtitles",
+    "Tatoeba",
 ]
 
 BICLEANER_CORPUS_PREFIXES = [
-    "GlobalVoices"
+    "GlobalVoices",
+    "EUbookshop",
 ]
 
 DIC = f"{LANG1}-{LANG2}.dic"
