@@ -27,6 +27,8 @@ cat corpus.en-ja.bad | cut -f1 > corpus.en-ja.bad.en
 cat corpus.en-ja.bad | cut -f2 > corpus.en-ja.bad.ja
 shuf corpus.en-ja.bad.ja > corpus.en-ja.bad.shuf
 paste corpus.en-ja.bad.en corpus.en-ja.bad.shuf > corpus.en-ja.bad
+cat corpus.en-ja.bad | cut -f1 > corpus.en-ja.bad.en
+cat corpus.en-ja.bad | cut -f2 > corpus.en-ja.bad.ja
 
 cat corpus.en-ja.dev | cut -f1 > corpus.en-ja.dev.en
 cat corpus.en-ja.dev | cut -f2 > corpus.en-ja.dev.ja
