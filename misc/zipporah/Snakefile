@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+
+import gzip
+
+LANG1 = "en"
+LANG2 = "ja"
+
+MOSES = "/root/mosesdecoder"
+FAST_ALIGN = "/root/fast_align/build"
+
+TMP_DIR = "/tmp"
+
+WORK_DIR = "work"
+PPROC_DIR = WORK_DIR + "/pproc"
+ALIGN_DIR = WORK_DIR + "/align"
+LM_DIR = WORK_DIR + "/lm"
+
+PROFILING = ""
+
+WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
+WORDTOK2 = "mecab -Owakati"
+
+GOOD_PREFIXES = [
+    "GlobalVoices",
+    "EUbookshop",
+#    "OpenSubtitles",
+#    "Tatoeba",
+]
+
+DEV_PREFIXES = [
+    "GlobalVoices",
+    "EUbookshop",
+]
+
+ZIPPORAH = "/root/zipporah"
+ZIPO_CONFIG = "config"
+ZIPO_ALIGNER = "fast-align"
+ZIPO_DICT_COUNT_THRESHOLD = 1  # Only words with counts larger than this number is considered for numerator.
+ZIPO_DICT_TOTAL_COUNT_THRESHOLD = 1  # Only words with counts larger than this number is considered for denominator.
+ZIPO_BOW_CONSTANT = 0.0001
+ZIPO_WORD_COUNT = 30000
+ZIPO_NGRAM_ORDER = 5
+
+DIC = f"{LANG1}-{LANG2}.dic"
+ZIPO_MODEL = f"{LANG1}-{LANG2}.model"
+
+OUTPUT = [
+#    ZIPO_MODEL
+#    f"{ALIGN_DIR}/good.en-ja.xent"
+    f"{LM_DIR}/bin.lm.{LANG1}",
+    f"{LM_DIR}/bin.lm.{LANG2}",
+    f"{LM_DIR}/ngram.both.{LANG1}",
+]
+
+rule all:
+    input:
+        expand("{target}", target=OUTPUT)
+
+# ================================= TRAIN Zipporah ================================= #
+
+rule prepare_good_l1:
+    input:
+        good = expand("{dataset}.{lang1}-{lang2}.{lang1}.xz", dataset=GOOD_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        train = f"{PPROC_DIR}/train.{LANG1}",
+        caser = f"{PPROC_DIR}/truecase-model.{LANG1}"
+    params:
+        tok = f"{PPROC_DIR}/train.tok.{LANG1}",
+    shell:
+        "mkdir -p {PPROC_DIR};"
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK1} > {params.tok};"
+        'perl {MOSES}/scripts/recaser/train-truecaser.perl --model {output.caser} --corpus {params.tok};'
+        "perl {MOSES}/scripts/recaser/truecase.perl --model {output.caser} < {params.tok} > {output.train};"
+
+rule prepare_good_l2:
+    input:
+        good = expand("{dataset}.{lang1}-{lang2}.{lang2}.xz", dataset=GOOD_PREFIXES, lang1=LANG1, lang2=LANG2)
+    output:
+        train = f"{PPROC_DIR}/train.{LANG2}",
+        caser = f"{PPROC_DIR}/truecase-model.{LANG2}"
+    params:
+        tok = f"{PPROC_DIR}/train.tok.{LANG2}",
+    shell:
+        "mkdir -p {PPROC_DIR};"
+        "xzcat -T 0 -f {input} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK2} > {params.tok};"
+        'perl {MOSES}/scripts/recaser/train-truecaser.perl --model {output.caser} --corpus {params.tok};'
+        "perl {MOSES}/scripts/recaser/truecase.perl --model {output.caser} < {params.tok} > {output.train};"
+
+rule align_corpus:
+    input:
+        train1 = f"{PPROC_DIR}/train.{LANG1}",
+        train2 = f"{PPROC_DIR}/train.{LANG1}"
+    output:
+        f"{ALIGN_DIR}/alignment"
+    shell:
+        '{ZIPPORAH}/scripts/align-corpus.sh {ZIPO_CONFIG} {ZIPO_ALIGNER} {input.train1} {input.train2} {output} {ALIGN_DIR}/tmp'
+
+rule align_to_dict:
+    input:
+        train1 = f"{PPROC_DIR}/train.{LANG1}",
+        train2 = f"{PPROC_DIR}/train.{LANG1}"
+    output:
+        dic1 = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
+        dic2 = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
+    shell:
+        '{ZIPPORAH}/tools/align-to-dict {ZIPO_DICT_COUNT_THRESHOLD} {ZIPO_DICT_TOTAL_COUNT_THRESHOLD} {input.train1} {input.train2} {ALIGN_DIR} {output.dic1} {output.dic2}'
+
+rule prepare_dev_l1:
+    input:
+        dev = expand("{dataset}.{lang1}-{lang2}.{lang1}.xz", dataset=DEV_PREFIXES, lang1=LANG1, lang2=LANG2),
+        caser = f"{PPROC_DIR}/truecase-model.{LANG2}"
+    output:
+        f"{PPROC_DIR}/dev.{LANG1}"
+    params:
+        tok = f"{PPROC_DIR}/dev.tok.{LANG1}",
+    shell:
+        "xzcat -T 0 -f {input.dev} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK1} > {params.tok};"
+        "perl {MOSES}/scripts/recaser/truecase.perl --model {input.caser} < {params.tok} > {output};"
+
+rule prepare_dev_l2:
+    input:
+        dev = expand("{dataset}.{lang1}-{lang2}.{lang2}.xz", dataset=DEV_PREFIXES, lang1=LANG1, lang2=LANG2),
+        caser = f"{PPROC_DIR}/truecase-model.{LANG2}"
+    output:
+        f"{PPROC_DIR}/dev.{LANG2}"
+    params:
+        tok = f"{PPROC_DIR}/dev.tok.{LANG2}",
+    shell:
+        "xzcat -T 0 -f {input.dev} | sed \"s/&apos;/'/g\" | sed 's/&quot;/\"/g' | sed 's/&amp;/\&/g' | {WORDTOK2} > {params.tok};"
+        "perl {MOSES}/scripts/recaser/truecase.perl --model {input.caser} < {params.tok} > {output};"
+
+rule test_dict:
+    input:
+        dev1 = f"{PPROC_DIR}/dev.{LANG1}",
+        dev2 = f"{PPROC_DIR}/dev.{LANG2}",
+        dic1 = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
+        dic2 = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
+    params:
+        dev2_shuf = f"{PPROC_DIR}/dev.shuf.{LANG2}"
+    output:
+        xent_good1 = f"{ALIGN_DIR}/good.{LANG1}-{LANG2}.xent",
+        xent_good2 = f"{ALIGN_DIR}/good.{LANG2}-{LANG1}.xent",
+        xent_bad1 = f"{ALIGN_DIR}/bad.{LANG1}-{LANG1}.xent",
+        xent_bad2 = f"{ALIGN_DIR}/bad.{LANG2}-{LANG1}.xent",
+    shell:
+        'cat {input.dev2} | {ZIPPORAH}/scripts/shuf.sh > {params.dev2_shuf};'
+
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic2} {input.dev2} {input.dev1} {ZIPO_BOW_CONSTANT} > {output.xent_good2};'
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic1} {input.dev1} {input.dev2} {ZIPO_BOW_CONSTANT} > {output.xent_good1};'
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic2} {params.dev2_shuf} {input.dev1} {ZIPO_BOW_CONSTANT} > {output.xent_bad2};'
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic1} {input.dev1} {params.dev2_shuf} {ZIPO_BOW_CONSTANT} > {output.xent_bad1};'
+
+        "paste {ALIGN_DIR}/good.*.xent | awk '{{print $1+$2}}' > {ALIGN_DIR}/good.xent;"
+        "paste {ALIGN_DIR}/bad.*.xent | awk '{{print $1+$2}}' > {ALIGN_DIR}/bad.xent;"
+
+        "n=`wc {ALIGN_DIR}/good.xent | awk '{{print $1}}'`;"
+
+        "cat {ALIGN_DIR}/{{good,bad}}.xent | awk '{{print NR,$0}}' > {ALIGN_DIR}/both.xent;"
+        'cat {ALIGN_DIR}/both.xent | sort -k2 -g | head -n $n | sort -k1n | grep -n "$n " | sed "s=:= =g" | awk \'{{print "the quality of the dictionary is", $1 / $2, "out of 1.0"}}\' || true;'
+
+rule prepare_bad_dev:
+    input:
+        dev1 = f"{PPROC_DIR}/dev.{LANG1}",
+        dev2 = f"{PPROC_DIR}/dev.{LANG2}",
+    output:
+        dev_shufw1 = f"{PPROC_DIR}/dev.shufwords.{LANG1}",
+        dev_shufw2 = f"{PPROC_DIR}/dev.shufwords.{LANG2}",
+        bad1 = f"{PPROC_DIR}/bad.dev.{LANG1}",
+        bad2 = f"{PPROC_DIR}/bad.dev.{LANG2}",
+    shell:
+        'cat {input.dev1} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG1};'
+        'cat {input.dev2} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG2};'
+        'cat {PPROC_DIR}/dev.shufwords.{LANG2} | {ZIPPORAH}/scripts/shuf.sh > {PPROC_DIR}/dev.shufboth.{LANG2};'
+
+        # good fluency bad adequacy
+        'cat {PPROC_DIR}/dev.{LANG1} > {PPROC_DIR}/bad.dev.{LANG1};'
+        'cat {PPROC_DIR}/dev.shuf.{LANG2} > {PPROC_DIR}/bad.dev.{LANG2};'
+
+        # good adequacy bad fluency
+        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {PPROC_DIR}/bad.dev.{LANG1};'
+        'cat {PPROC_DIR}/dev.shufwords.{LANG2} >> {PPROC_DIR}/bad.dev.{LANG2};'
+
+        # bad both
+        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {PPROC_DIR}/bad.dev.{LANG1};'
+        'cat {PPROC_DIR}/dev.shufboth.{LANG2} >> {PPROC_DIR}/bad.dev.{LANG2};'
+
+rule train_lm:
+    input:
+        f"{PPROC_DIR}/train.{{lang}}"
+    output:
+        vocab = f"{LM_DIR}/vocab.{{lang}}",
+        lm = f"{LM_DIR}/lm.{{lang}}",
+        binlm = f"{LM_DIR}/bin.lm.{{lang}}"
+    shell:
+        'cat {input} | awk \'{{for(i=1;i<=NF;i++)print$i}}\' | sort | uniq -c | sort -n -k1 -r | head -n {ZIPO_WORD_COUNT} | awk \'{{print$2}}\' > {output.vocab} || true;'
+        'echo Training LM for {wildcards.lang};'
+        '{MOSES}/bin/lmplz --prune 0 0 1 -S 10G --order {ZIPO_NGRAM_ORDER} --limit_vocab_file {output.vocab} --text {input} --arpa {output.lm};'
+        '{MOSES}/bin/build_binary {output.lm} {output.binlm};'
+
+rule test_lm_lang:
+    """ [step-1] test lm's on dev data
+    """
+    input:
+        vocab = f"{LM_DIR}/vocab.{{lang}}",
+        binlm = f"{LM_DIR}/bin.lm.{{lang}}",
+        dev = f"{PPROC_DIR}/dev.{{lang}}",
+        dev_shufw = f"{PPROC_DIR}/dev.shufwords.{{lang}}",
+    output:
+        dev_log = f"{LM_DIR}/ngram.good.{{lang}}",
+        dev_shufw_log = f"{LM_DIR}/ngram.bad.{{lang}}"
+    shell:
+        'map_unk=`tail -n 1 {input.vocab}`;'
+        'echo {wildcards.lang} good;'
+        'cat {input.dev} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {LM_DIR}/ngram.good.total.{wildcards.lang};'
+        # +1 because of the EOS symbol
+        'cat {input.dev} | awk \'{{print NF + 1}}\' > {LM_DIR}/ngram.good.length;'
+        'paste {LM_DIR}/ngram.good.total.{wildcards.lang} {LM_DIR}/ngram.good.length | awk \'{{print $1 / $2}}\' > {LM_DIR}/ngram.good.{wildcards.lang};'
+
+        'echo {wildcards.lang} bad;'
+        'cat {input.dev_shufw} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {LM_DIR}/ngram.bad.total.{wildcards.lang};'
+        # +1 because of the EOS symbol'
+        'cat {input.dev_shufw} | awk \'{{print NF + 1}}\' > {LM_DIR}/ngram.bad.length;'
+        'paste {LM_DIR}/ngram.bad.total.{wildcards.lang} {LM_DIR}/ngram.bad.length | awk \'{{print $1 / $2}}\' > {LM_DIR}/ngram.bad.{wildcards.lang};'
+
+rule test_lm:
+    input:
+        dev_log = f"{LM_DIR}/ngram.good.{{lang}}",
+        dev_shufw_log = f"{LM_DIR}/ngram.bad.{{lang}}"
+    output:
+        ngram_both = f"{LM_DIR}/ngram.both"
+    shell:
+        'paste {LM_DIR}/ngram.good.?? | awk \'{{print $1+$2}}\' > {LM_DIR}/ngram.good;'
+        'paste {LM_DIR}/ngram.bad.??  | awk \'{{print $1+$2}}\' > {LM_DIR}/ngram.bad;'
+
+        'n=`wc {LM_DIR}/ngram.good | awk \'{{print $1}}\'`;'
+
+        'cat {LM_DIR}/ngram.{good,bad} | awk \'{{print NR,$0}}\' > {output};'
+
+        'cat {output} | sort -k2 -g | head -n $n | sort -k1n | grep -n "$n " | sed "s=:= =g" | awk \'{print "the quality of the lm is", $1 / $2, "out of 1.0"}\';'
+
