@@ -14,6 +14,8 @@ WORK_DIR = "work"
 PPROC_DIR = WORK_DIR + "/pproc"
 ALIGN_DIR = WORK_DIR + "/align"
 LM_DIR = WORK_DIR + "/lm"
+FEAT_DIR = WORK_DIR + "/feat"
+TRAIN_DIR = WORK_DIR + "/train"
 
 PROFILING = ""
 
@@ -22,13 +24,13 @@ WORDTOK2 = "mecab -Owakati"
 
 GOOD_PREFIXES = [
     "GlobalVoices",
-    "EUbookshop",
+#    "EUbookshop",
 #    "OpenSubtitles",
 #    "Tatoeba",
 ]
 
 DEV_PREFIXES = [
-    "GlobalVoices",
+#    "GlobalVoices",
     "EUbookshop",
 ]
 
@@ -40,16 +42,33 @@ ZIPO_DICT_TOTAL_COUNT_THRESHOLD = 1  # Only words with counts larger than this n
 ZIPO_BOW_CONSTANT = 0.0001
 ZIPO_WORD_COUNT = 30000
 ZIPO_NGRAM_ORDER = 5
+ZIPO_TRANSLATION_NUM_JOBS = 50
 
-DIC = f"{LANG1}-{LANG2}.dic"
-ZIPO_MODEL = f"{LANG1}-{LANG2}.model"
+ZIPO_MODEL = f"{TRAIN_DIR}/zipporah.{LANG1}-{LANG2}.model"
 
 OUTPUT = [
-#    ZIPO_MODEL
-#    f"{ALIGN_DIR}/good.en-ja.xent"
-    f"{LM_DIR}/bin.lm.{LANG1}",
-    f"{LM_DIR}/bin.lm.{LANG2}",
-    f"{LM_DIR}/ngram.both.{LANG1}",
+    ZIPO_MODEL
+#    f"{ALIGN_DIR}/dict.en-ja",
+#    f"{ALIGN_DIR}/dict.ja-en",
+#    f"{ALIGN_DIR}/good.en-ja.xent",
+#    f"{ALIGN_DIR}/good.ja-en.xent",
+#    f"{ALIGN_DIR}/bad.en-ja.xent",
+#    f"{ALIGN_DIR}/bad.ja-en.xent",
+#    f"{LM_DIR}/bin.lm.{LANG1}",
+#    f"{LM_DIR}/bin.lm.{LANG2}",
+#    f"{LM_DIR}/ngram.both",
+#    f"{FEAT_DIR}/translation.dev.en-ja",
+#    f"{FEAT_DIR}/translation.dev.ja-en",
+#    f"{FEAT_DIR}/translation.dev.bad.en-ja",
+#    f"{FEAT_DIR}/translation.dev.bad.ja-en",
+#    f"{FEAT_DIR}/ngram.dev.ja",
+#    f"{FEAT_DIR}/ngram.dev.en",
+#    f"{FEAT_DIR}/ngram.dev.bad.ja",
+#    f"{FEAT_DIR}/ngram.dev.bad.en",
+#    f"{FEAT_DIR}/dev.feats",
+#    f"{FEAT_DIR}/dev.bad.feats",
+#    f"{TRAIN_DIR}/train.feats",
+#    f"{TRAIN_DIR}/train.label",
 ]
 
 rule all:
@@ -89,7 +108,7 @@ rule prepare_good_l2:
 rule align_corpus:
     input:
         train1 = f"{PPROC_DIR}/train.{LANG1}",
-        train2 = f"{PPROC_DIR}/train.{LANG1}"
+        train2 = f"{PPROC_DIR}/train.{LANG2}"
     output:
         f"{ALIGN_DIR}/alignment"
     shell:
@@ -98,12 +117,13 @@ rule align_corpus:
 rule align_to_dict:
     input:
         train1 = f"{PPROC_DIR}/train.{LANG1}",
-        train2 = f"{PPROC_DIR}/train.{LANG1}"
+        train2 = f"{PPROC_DIR}/train.{LANG2}",
+        alignment = f"{ALIGN_DIR}/alignment",
     output:
         dic1 = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
         dic2 = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
     shell:
-        '{ZIPPORAH}/tools/align-to-dict {ZIPO_DICT_COUNT_THRESHOLD} {ZIPO_DICT_TOTAL_COUNT_THRESHOLD} {input.train1} {input.train2} {ALIGN_DIR} {output.dic1} {output.dic2}'
+        '{ZIPPORAH}/tools/align-to-dict {ZIPO_DICT_COUNT_THRESHOLD} {ZIPO_DICT_TOTAL_COUNT_THRESHOLD} {input.train1} {input.train2} {input.alignment} {output.dic1} {output.dic2}'
 
 rule prepare_dev_l1:
     input:
@@ -140,7 +160,7 @@ rule test_dict:
     output:
         xent_good1 = f"{ALIGN_DIR}/good.{LANG1}-{LANG2}.xent",
         xent_good2 = f"{ALIGN_DIR}/good.{LANG2}-{LANG1}.xent",
-        xent_bad1 = f"{ALIGN_DIR}/bad.{LANG1}-{LANG1}.xent",
+        xent_bad1 = f"{ALIGN_DIR}/bad.{LANG1}-{LANG2}.xent",
         xent_bad2 = f"{ALIGN_DIR}/bad.{LANG2}-{LANG1}.xent",
     shell:
         'cat {input.dev2} | {ZIPPORAH}/scripts/shuf.sh > {params.dev2_shuf};'
@@ -165,24 +185,31 @@ rule prepare_bad_dev:
     output:
         dev_shufw1 = f"{PPROC_DIR}/dev.shufwords.{LANG1}",
         dev_shufw2 = f"{PPROC_DIR}/dev.shufwords.{LANG2}",
-        bad1 = f"{PPROC_DIR}/bad.dev.{LANG1}",
-        bad2 = f"{PPROC_DIR}/bad.dev.{LANG2}",
+
+        dev1 = f"{FEAT_DIR}/dev.{LANG1}",
+        dev2 = f"{FEAT_DIR}/dev.{LANG2}",
+        bad1 = f"{FEAT_DIR}/dev.bad.{LANG1}",
+        bad2 = f"{FEAT_DIR}/dev.bad.{LANG2}",
     shell:
         'cat {input.dev1} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG1};'
         'cat {input.dev2} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG2};'
         'cat {PPROC_DIR}/dev.shufwords.{LANG2} | {ZIPPORAH}/scripts/shuf.sh > {PPROC_DIR}/dev.shufboth.{LANG2};'
 
         # good fluency bad adequacy
-        'cat {PPROC_DIR}/dev.{LANG1} > {PPROC_DIR}/bad.dev.{LANG1};'
-        'cat {PPROC_DIR}/dev.shuf.{LANG2} > {PPROC_DIR}/bad.dev.{LANG2};'
+        'cat {PPROC_DIR}/dev.{LANG1} > {output.bad1};'
+        'cat {PPROC_DIR}/dev.shuf.{LANG2} > {output.bad2};'
 
         # good adequacy bad fluency
-        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {PPROC_DIR}/bad.dev.{LANG1};'
-        'cat {PPROC_DIR}/dev.shufwords.{LANG2} >> {PPROC_DIR}/bad.dev.{LANG2};'
+        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {output.bad1};'
+        'cat {PPROC_DIR}/dev.shufwords.{LANG2} >> {output.bad2};'
 
         # bad both
-        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {PPROC_DIR}/bad.dev.{LANG1};'
-        'cat {PPROC_DIR}/dev.shufboth.{LANG2} >> {PPROC_DIR}/bad.dev.{LANG2};'
+        'cat {PPROC_DIR}/dev.shufwords.{LANG1} >> {output.bad1};'
+        'cat {PPROC_DIR}/dev.shufboth.{LANG2} >> {output.bad2};'
+
+        # good both (copy)
+        'cp {input.dev1} {output.dev1};'
+        'cp {input.dev2} {output.dev2};'
 
 rule train_lm:
     input:
@@ -197,35 +224,37 @@ rule train_lm:
         '{MOSES}/bin/lmplz --prune 0 0 1 -S 10G --order {ZIPO_NGRAM_ORDER} --limit_vocab_file {output.vocab} --text {input} --arpa {output.lm};'
         '{MOSES}/bin/build_binary {output.lm} {output.binlm};'
 
-rule test_lm_lang:
+rule test_ngram_lm:
     """ [step-1] test lm's on dev data
     """
     input:
         vocab = f"{LM_DIR}/vocab.{{lang}}",
         binlm = f"{LM_DIR}/bin.lm.{{lang}}",
         dev = f"{PPROC_DIR}/dev.{{lang}}",
-        dev_shufw = f"{PPROC_DIR}/dev.shufwords.{{lang}}",
+        dev_bad = f"{PPROC_DIR}/dev.shufwords.{{lang}}",
     output:
-        dev_log = f"{LM_DIR}/ngram.good.{{lang}}",
-        dev_shufw_log = f"{LM_DIR}/ngram.bad.{{lang}}"
+        ngram_good = f"{LM_DIR}/ngram.good.{{lang}}",
+        ngram_bad = f"{LM_DIR}/ngram.bad.{{lang}}"
     shell:
         'map_unk=`tail -n 1 {input.vocab}`;'
         'echo {wildcards.lang} good;'
         'cat {input.dev} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {LM_DIR}/ngram.good.total.{wildcards.lang};'
         # +1 because of the EOS symbol
         'cat {input.dev} | awk \'{{print NF + 1}}\' > {LM_DIR}/ngram.good.length;'
-        'paste {LM_DIR}/ngram.good.total.{wildcards.lang} {LM_DIR}/ngram.good.length | awk \'{{print $1 / $2}}\' > {LM_DIR}/ngram.good.{wildcards.lang};'
+        'paste {LM_DIR}/ngram.good.total.{wildcards.lang} {LM_DIR}/ngram.good.length | awk \'{{print $1 / $2}}\' > {output.ngram_good};'
 
         'echo {wildcards.lang} bad;'
-        'cat {input.dev_shufw} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {LM_DIR}/ngram.bad.total.{wildcards.lang};'
+        'cat {input.dev_bad} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {LM_DIR}/ngram.bad.total.{wildcards.lang};'
         # +1 because of the EOS symbol'
-        'cat {input.dev_shufw} | awk \'{{print NF + 1}}\' > {LM_DIR}/ngram.bad.length;'
-        'paste {LM_DIR}/ngram.bad.total.{wildcards.lang} {LM_DIR}/ngram.bad.length | awk \'{{print $1 / $2}}\' > {LM_DIR}/ngram.bad.{wildcards.lang};'
+        'cat {input.dev_bad} | awk \'{{print NF + 1}}\' > {LM_DIR}/ngram.bad.length;'
+        'paste {LM_DIR}/ngram.bad.total.{wildcards.lang} {LM_DIR}/ngram.bad.length | awk \'{{print $1 / $2}}\' > {output.ngram_bad};'
 
-rule test_lm:
+rule test_ngram_lm_score:
     input:
-        dev_log = f"{LM_DIR}/ngram.good.{{lang}}",
-        dev_shufw_log = f"{LM_DIR}/ngram.bad.{{lang}}"
+        ngram_good1 = f"{LM_DIR}/ngram.good.{LANG1}",
+        ngram_good2 = f"{LM_DIR}/ngram.good.{LANG2}",
+        ngram_bad1 = f"{LM_DIR}/ngram.bad.{LANG1}",
+        ngram_bad2 = f"{LM_DIR}/ngram.bad.{LANG2}",
     output:
         ngram_both = f"{LM_DIR}/ngram.both"
     shell:
@@ -234,7 +263,101 @@ rule test_lm:
 
         'n=`wc {LM_DIR}/ngram.good | awk \'{{print $1}}\'`;'
 
-        'cat {LM_DIR}/ngram.{good,bad} | awk \'{{print NR,$0}}\' > {output};'
+        'cat {LM_DIR}/ngram.{{good,bad}} | awk \'{{print NR,$0}}\' > {output};'
 
-        'cat {output} | sort -k2 -g | head -n $n | sort -k1n | grep -n "$n " | sed "s=:= =g" | awk \'{print "the quality of the lm is", $1 / $2, "out of 1.0"}\';'
+        'cat work/lm/ngram.both | sort -k2 -g | head -n $n | sort -k1n | grep -n "$n " | sed "s=:= =g" | awk \'{{print "the quality of the lm is", $1 / $2, "out of 1.0"}}\' || true;'
 
+rule translation:
+    input:
+        data1 = f"{FEAT_DIR}/{{data}}.{LANG1}",
+        data2 = f"{FEAT_DIR}/{{data}}.{LANG2}",
+        f2e = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
+        e2f = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
+    output:
+        trans1 = f"{FEAT_DIR}/translation.{{data}}.{LANG1}-{LANG2}",
+        trans2 = f"{FEAT_DIR}/translation.{{data}}.{LANG2}-{LANG1}",
+    shell:
+        'tmpfolder={FEAT_DIR}/translation/;'
+        'mkdir -p $tmpfolder;'
+        'rm -rf $tmpfolder;'
+        'mkdir -p $tmpfolder;'
+
+        'paste {input.data1} {input.data2} > $tmpfolder/pasted;'
+        'split -a 3 -d -n l/{ZIPO_TRANSLATION_NUM_JOBS} $tmpfolder/pasted $tmpfolder/pasted.s.;'
+
+        'n={ZIPO_TRANSLATION_NUM_JOBS};'
+        'for i in `seq -w $[$n-1] -1 0`; do'
+        '    while [ ! -f $tmpfolder/pasted.s.$i ]; do'
+        '        i=0$i;'
+        '    done;'
+        '    cat $tmpfolder/pasted.s.$i | awk -F \'\t\' \'{{print $1}}\' > $tmpfolder/s.in.$n;'
+        '    cat $tmpfolder/pasted.s.$i | awk -F \'\t\' \'{{print $2}}\' > $tmpfolder/s.out.$n;'
+        '    n=$[$n-1];'
+        'done;'
+
+        'n={ZIPO_TRANSLATION_NUM_JOBS};'
+        'for i in `seq -w $[$n-1] -1 0`; do'
+        '    {ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.in.$n $tmpfolder/s.out.$n {input.f2e} $tmpfolder/out.f2e.$n;'
+        '    {ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.out.$n $tmpfolder/s.in.$n {input.e2f} $tmpfolder/out.e2f.$n;'
+        '    n=$[$n-1];'
+        'done;'
+
+        'touch {output.trans1} {output.trans2};'
+        'rm {output.trans1} {output.trans2};'
+
+        'for i in `seq 1 $[{ZIPO_TRANSLATION_NUM_JOBS}]`; do'
+        '    cat $tmpfolder/out.f2e.$i >> {output.trans1};'
+        '    cat $tmpfolder/out.e2f.$i >> {output.trans2};'
+        'done'
+
+rule ngram_lm_score: 
+    input:
+        data  = f"{FEAT_DIR}/{{data}}.{{lang}}",
+        vocab = f"{LM_DIR}/vocab.{{lang}}",
+        binlm = f"{LM_DIR}/bin.lm.{{lang}}",
+    output:
+        ngram = f"{FEAT_DIR}/ngram.{{data}}.{{lang, [a-z][a-z]}}",
+    shell:
+        'map_unk=`tail -n 1 {input.vocab}`;'
+
+        'cat {input.data} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.binlm} | grep ^Total | awk \'{{print -$2}}\' > {FEAT_DIR}/ngram.total.{wildcards.lang};'
+        # +1 because of the EOS symbol
+        'cat {input.data} | awk \'{{print NF + 1}}\' > {FEAT_DIR}/ngram.length.{wildcards.lang};'
+        'paste {FEAT_DIR}/ngram.total.{wildcards.lang} {FEAT_DIR}/ngram.length.{wildcards.lang} | awk \'{{print $1 / $2}}\' > {output.ngram};'
+
+rule prepare_data_feats:
+    input:
+        trans1 = f"{FEAT_DIR}/translation.{{data}}.{LANG1}-{LANG2}",
+        trans2 = f"{FEAT_DIR}/translation.{{data}}.{LANG2}-{LANG1}",
+        ngram1 = f"{FEAT_DIR}/ngram.{{data}}.{LANG1}",
+        ngram2 = f"{FEAT_DIR}/ngram.{{data}}.{LANG2}",
+    output:
+        feats = f"{FEAT_DIR}/{{data}}.feats",
+    shell:
+        'paste {input.trans1} {input.trans2} | awk \'{{print ($1) + ($2)}}\' > {FEAT_DIR}/translation.sum;'
+
+        'echo the following output should be only one line;'
+        'echo BEGIN OF OUTPUT;'
+        'paste {input.trans1} {input.trans2} {input.ngram1} {input.ngram2} | awk \'{{print ($1)+($2),"\t",($3)+($4)}}\' | awk \'{{a=$1/10;b=$2/10;print a^8,b^8}}\' | tee {output.feats} | awk \'{{print NF}}\' | uniq -c;'
+        'echo END OF OUTPUT;'
+
+rule prepare_feats:
+    input:
+        dev = f"{FEAT_DIR}/dev.feats",
+        bad = f"{FEAT_DIR}/dev.bad.feats",
+    output:
+        feats = f"{TRAIN_DIR}/train.feats",
+        label = f"{TRAIN_DIR}/train.label",
+    shell:
+        'cat {input.dev} {input.bad} >  {output.feats};'
+        'cat {input.dev} | awk \'{{print 1}}\'  >  {output.label};'
+        'cat {input.bad} | awk \'{{print 0}}\'  >> {output.label};'
+
+rule train:
+    input:
+        X = f"{TRAIN_DIR}/train.feats",
+        y = f"{TRAIN_DIR}/train.label",
+    output:
+        ZIPO_MODEL
+    shell:
+        'python ./scripts/zipporah.py train {input.X} {input.y} {output}'
