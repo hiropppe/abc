@@ -116,4 +116,4 @@ for i in tqdm(range(len(l1_urls))):
 
 for m in matches:
     i, j = m
-    print("{0}\t{1}\t{2}\t{3}".format(i, j, l1_texts[i], l2_texts[j]))
+    print("{0}\t{1}\t{2}\t{3}".format(i, j, l1_texts[i-1], l2_texts[j-1]))
