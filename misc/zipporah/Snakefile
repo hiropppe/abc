@@ -44,10 +44,19 @@ ZIPO_WORD_COUNT = 30000
 ZIPO_NGRAM_ORDER = 5
 ZIPO_TRANSLATION_NUM_JOBS = 50
 
-ZIPO_MODEL = f"{TRAIN_DIR}/zipporah.{LANG1}-{LANG2}.model"
+ZIPO_MODEL = f"{TRAIN_DIR}/{LANG1}-{LANG2}.model"
+
+DEPLOY_DIR = "/data/bitextor/model/zipporah"
 
 OUTPUT = [
-    ZIPO_MODEL
+#    ZIPO_MODEL
+    f"{DEPLOY_DIR}/en-ja.model",
+    f"{DEPLOY_DIR}/dict.en-ja",
+    f"{DEPLOY_DIR}/dict.ja-en",
+    f"{DEPLOY_DIR}/vocab.en",
+    f"{DEPLOY_DIR}/vocab.ja",
+    f"{DEPLOY_DIR}/lm.en",
+    f"{DEPLOY_DIR}/lm.ja",
 #    f"{ALIGN_DIR}/dict.en-ja",
 #    f"{ALIGN_DIR}/dict.ja-en",
 #    f"{ALIGN_DIR}/good.en-ja.xent",
@@ -361,3 +370,29 @@ rule train:
         ZIPO_MODEL
     shell:
         'python ./scripts/zipporah.py train {input.X} {input.y} {output}'
+
+rule deploy:
+    input:
+        model = ZIPO_MODEL,
+        dic1 = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
+        dic2 = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
+        vocab1 = f"{LM_DIR}/vocab.{LANG1}",
+        vocab2 = f"{LM_DIR}/vocab.{LANG2}",
+        lm1 = f"{LM_DIR}/bin.lm.{LANG1}",
+        lm2 = f"{LM_DIR}/bin.lm.{LANG2}",
+    output:
+        model = f"{DEPLOY_DIR}/{LANG1}-{LANG2}.model",
+        dic1 = f"{DEPLOY_DIR}/dict.{LANG1}-{LANG2}",
+        dic2 = f"{DEPLOY_DIR}/dict.{LANG2}-{LANG1}",
+        vocab1 = f"{DEPLOY_DIR}/vocab.{LANG1}",
+        vocab2 = f"{DEPLOY_DIR}/vocab.{LANG2}",
+        lm1 = f"{DEPLOY_DIR}/lm.{LANG1}",
+        lm2 = f"{DEPLOY_DIR}/lm.{LANG2}",
+    shell:
+        'cp {input.model} {output.model};'
+        'cp {input.dic1} {output.dic1};'
+        'cp {input.dic2} {output.dic2};'
+        'cp {input.vocab1} {output.vocab1};'
+        'cp {input.vocab2} {output.vocab2};'
+        'cp {input.lm1} {output.lm1};'
+        'cp {input.lm2} {output.lm2};'

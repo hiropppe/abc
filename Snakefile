@@ -94,6 +94,7 @@ MOSES = Path(config["moses"])
 HUNALIGN = Path(config["hunalign"])
 MGIZA = Path(config["mgiza"])
 BICLEANER = Path(config["bicleaner"])
+ZIPPORAH = Path(config["zipporah"])
 
 MKCLS = config.get("mkcls")
 if MKCLS:
@@ -205,16 +206,12 @@ elif SALIGN == "LASER":
 else:
     SALIGN_SUFFIX = ""
 
-MAX_LINES = int(config.get("maxlines", "-1"))
-
-TRAIN_PREFIXES = config.get("initCorpusTrainPrefix")
-
 if "bifixer" in config and config["bifixer"]:
     BIFIXER = "bifixer"
     BIFIXERFIELD = ",bifixerhash,bifixerscore"
+    CACHEOPTIONS = '-k 6,7'
     BICLEANER_SORT = ""
     DEDUP = '--dedup "bifixerhash"'
-    CACHEOPTIONS = '-k 6,7'
 else:
     BIFIXER = "segclean"
     BIFIXERFIELD = ""
@@ -225,26 +222,29 @@ if "bifixerOptions" in config:
 else:
     BIFIXEROPTIONS = "--aggressive_dedup"
 
-if "bicleanerConfig" in config:
-    RAWOPTION = "bicleaner.scores"
-    BICLEANEROPTION = ",bicleaner"
+FILTER = config.get("filter", "").upper()
+if FILTER == "BICLEANER":
+    FILTER_SUFFIX = ".bic"
     BICLEANER_CONFIG = config["bicleanerConfig"]
-    FILTER = "bicleaner"
-    tokeniser_check(WORDTOK1)
-    tokeniser_check(WORDTOK2)
-else:
-    RAWOPTION = "segclean"
-    BICLEANEROPTION = ""
-    if BIFIXER:
-        FILTER = "bifixer"
-    else:
-        FILTER = "segclean"
-    BICLEANER_CONFIG = ""
+    BICLEANER_THRESHOLD = float(config.get("bicleanerThreshold", "0"))
 
-if "bicleanerThreshold" in config:
-    BICLEANER_THRESHOLD = config["bicleanerThreshold"]
+elif FILTER == "ZIPPORAH":
+    FILTER_SUFFIX = ".zip"
+    ZIPO_DIR = config["zipporahDir"]
+    ZIPO_CONFIG = config["zipporahConfig"]
+    ZIPO_MODEL = config["zipporahModel"]
+    ZIPO_DIC1 = config["zipporahDic1"]
+    ZIPO_DIC2 = config["zipporahDic2"]
+    ZIPO_VOCAB1 = config["zipporahVocab1"]
+    ZIPO_VOCAB2 = config["zipporahVocab2"]
+    ZIPO_LM1 = config["zipporahLM1"]
+    ZIPO_LM2 = config["zipporahLM2"]
 else:
-    BICLEANER_THRESHOLD = 0.0
+    FILTER_SUFFIX = ""
+
+MAX_LINES = int(config.get("maxlines", "-1"))
+
+TRAIN_PREFIXES = config.get("initCorpusTrainPrefix")
 
 PPROC_CORPUS_DIR = f"{TRANSIENT_DIR}/tempcorpuspreproc.{LANG1}-{LANG2}"
 MGIZA_MODEL_DIR = f"{TRANSIENT_DIR}/tempgizamodel.{LANG1}-{LANG2}"
@@ -287,6 +287,7 @@ PPROC_OUTPUT = []
 DALIGN_OUTPUT = []
 PALIGN_OUTPUT = []
 SALIGN_OUTPUT = []
+FILTER_OUTPUT = []
 
 TASK_LIST = config["task"]
 print(TASK_LIST)
@@ -296,10 +297,6 @@ if "build_bidic" in TASK_LIST:
 
 if "build_hunalign_dic" in TASK_LIST:
     BUILD_OUTPUT.append(HUNALIGN_DIC)
-
-if "train_bicleaner" in TASK_LIST:
-    BUILD_OUTPUT.append(BICLEANER_CONFIG)
-    BICLEANER_TRAIN_PREFIXES = config.get("bicleanerCorpusTrainingPrefix")
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
@@ -325,6 +322,12 @@ if "align-sentence" in TASK_LIST:
     for tld in domainkey2hosts.keys():
         SALIGN_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz")
 
+if "filtering" in TASK_LIST:
+    for tld in domainkey2hosts.keys():
+        FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/zipporah.score")
+        FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz")
+        #FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz")
+
 
 print(BUILD_OUTPUT)
 print(OUTPUT)
@@ -332,6 +335,7 @@ print(PPROC_OUTPUT)
 print(DALIGN_OUTPUT)
 print(PALIGN_OUTPUT)
 print(SALIGN_OUTPUT)
+print(FILTER_OUTPUT)
 
 
 rule all:
@@ -341,7 +345,8 @@ rule all:
         expand("{target}", target=PPROC_OUTPUT),
         expand("{target}", target=DALIGN_OUTPUT),
         expand("{target}", target=PALIGN_OUTPUT),
-        expand("{target}", target=SALIGN_OUTPUT)
+        expand("{target}", target=SALIGN_OUTPUT),
+        expand("{target}", target=FILTER_OUTPUT),
 
 # ================================== PREPROCESSING ====================================== #
 
@@ -565,6 +570,101 @@ rule clean_segment:
     shell:
         'xzcat -T 0 -f {input} | {PROFILING} ./scripts/clean_segment.py -q {MIN_QUALITY} -m {MAX_LINES} -s | xz -T 0 > {output}'
 
+# ================================== CLEANING (FILTERING) ================================== #
+
+rule bicleaner:
+    input:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz'
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.bic.score.xz'
+    shell:
+        'scores=$(mktemp "{TMP_DIR}/bicleaner.scores.XXXXXX");'
+        'slang=$(egrep "source_lang" {BICLEANER_CONFIG} | cut -d " " -f 2); '
+        'if [ "$slang" == "{LANG1}" ]; then '
+        '  xzcat -T 0 -f {input} | python3 {BICLEANER}/bicleaner/bicleaner_classifier_lite.py --score_only -q --threshold {BICLEANER_THRESHOLD} - - {BICLEANER_CONFIG} --scol 3 --tcol 4 > $scores; '
+        'else '
+        '  xzcat -T 0 -f {input} | python3 {BICLEANER}/bicleaner/bicleaner_classifier_lite.py --score-only -q --threshold {BICLEANER_THRESHOLD} - - {BICLEANER_CONFIG} --scol 4 --tcol 3 > $scores; '
+        'fi;'
+        'paste <(xzcat -T 0 {input}) $scores | xz -T 0 > {output};'
+        'rm $scores;'
+
+rule bicleaner_filter:
+    input:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.bic.score.xz'
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.bic.xz'
+    shell:
+        'xzcat -T 0 -f {input} | {PROFILING} ./scripts/filter_bicleaner.py --threshold {BICLEANER_THRESHOLD} | xz -T 0 > {output}'
+
+rule zipporah_trans_score:
+    input:
+        data = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz',
+    output:
+        trans1 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG1}-{LANG2}",
+        trans2 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG2}-{LANG1}",
+    shell:
+        'tmpfolder={TRANSIENT_DIR}/translation/;'
+        'mkdir -p $tmpfolder;'
+        'rm -rf $tmpfolder;'
+        'mkdir -p $tmpfolder;'
+
+        'xzcat -T 0 -f {input.data} | awk -F \'\t\' \'BEGIN{{OFS="\t"}} {{print ($3, $4)}}\' > $tmpfolder/pasted;'
+
+        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $1}}\' > $tmpfolder/s.in;'
+        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $2}}\' > $tmpfolder/s.out;'
+
+        '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.in $tmpfolder/s.out {ZIPO_DIC1} $tmpfolder/out.f2e;'
+        '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.out $tmpfolder/s.in {ZIPO_DIC2} $tmpfolder/out.e2f;'
+
+        'touch {output.trans1} {output.trans2};'
+        'rm {output.trans1} {output.trans2};'
+
+        'cat $tmpfolder/out.f2e >> {output.trans1};'
+        'cat $tmpfolder/out.e2f >> {output.trans2};'
+
+rule zipporah_lm_score:
+    input:
+        data = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz',
+        vocab = f'{ZIPO_DIR}/vocab.{{lang}}',
+        lm = f'{ZIPO_DIR}/lm.{{lang}}',
+    params:
+        col = lambda w: 3 if w["lang"] == LANG1 else 4,
+        tok = lambda w: WORDTOK1 if w["lang"] == LANG1 else WORDTOK2
+    output:
+        ngram = f"{TRANSIENT_DIR}/{{target}}/ngram.{{lang, [a-z][a-z]}}",
+    shell:
+        'map_unk=`tail -n 1 {input.vocab}`;'
+
+        'xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk -v v={input.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {input.lm} | grep ^Total | awk \'{{print -$2}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang};'
+        # +1 because of the EOS symbol
+        'xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk \'{{print NF + 1}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang};'
+        'paste {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang} {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang} | awk \'{{print $1 / $2}}\' > {output.ngram};'
+
+rule zipporah_feats:
+    input:
+        trans1 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG1}-{LANG2}",
+        trans2 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG2}-{LANG1}",
+        ngram1 = f"{TRANSIENT_DIR}/{{target}}/ngram.{LANG1}",
+        ngram2 = f"{TRANSIENT_DIR}/{{target}}/ngram.{LANG2}",
+    output:
+        feats = f"{TRANSIENT_DIR}/{{target}}/zipporah.feats",
+    shell:
+        'paste {input.trans1} {input.trans2} | awk \'{{print ($1) + ($2)}}\' > {TRANSIENT_DIR}/{wildcards.target}/translation.sum;'
+
+        'paste {input.trans1} {input.trans2} {input.ngram1} {input.ngram2} | awk \'{{print ($1)+($2),"\t",($3)+($4)}}\' | awk \'{{a=$1/10;b=$2/10;print a^8,b^8}}\' | tee {output.feats} | awk \'{{print NF}}\' | uniq -c;'
+
+rule zipporah:
+    input:
+        bitext = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.xz',
+        X = f"{TRANSIENT_DIR}/{{target}}/zipporah.feats",
+    output:
+        y = f"{TRANSIENT_DIR}/{{target}}/zipporah.score",
+        zipp = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz'
+    shell:
+        'python ./scripts/zipporah.py predict {input.X} {ZIPO_MODEL} {output.y};'
+        'paste <(xzcat -T 0 {input.bitext}) {output.y} | xz -T 0 > {output.zipp};'
+
+
 # ================================= TRAIN BILINGUAL DICTIONARIES ================================= #
 
 rule tokenize_file_l1:
@@ -719,73 +819,3 @@ rule symmetrise_dic:
         t3t.close()
         dic.close()
         os.sync()
-
-# ================================= TRAIN BILINGUAL DICTIONARIES ================================= #
-rule lex_dic:
-    """ Obtaining the harmonic probability of each pair of words in both directions and filtering out those with less than p=0.2; printing the dictionary
-    """
-    input:
-        vcb1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}.filtered.vcb",
-        vcb2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}.filtered.vcb",
-        t3_1 = f"{MGIZA_MODEL_DIR}/corpus.{LANG1}-{LANG2}.t3.final",
-        t3_2 = f"{MGIZA_MODEL_DIR}/corpus.{LANG2}-{LANG1}.t3.final"
-    output:
-        e2f = "{DIC}.lex.e2f.gz",
-        f2e = "{DIC}.lex.f2e.gz"
-    run:
-        svocabulary = {}
-        tvocabulary = {}
-        svcb = open(input.vcb1, "r")
-        tvcb = open(input.vcb2, "r")
-        for line in svcb:
-            item = line.strip().split(" ")
-            svocabulary[item[0]] = item[1]
-
-        for line in tvcb:
-            item = line.strip().split(" ")
-            tvocabulary[item[0]] = item[1]
-
-        t3s = open(input.t3_1, "r")
-        t3t = open(input.t3_2, "r")
-        dice2f = gzip.open(output[0], "wt")
-        dicf2e = gzip.open(output[1], "wt")
-
-        for line in t3t:
-            item = line.strip().split(" ")
-            value = float(item[2])
-            if value > 0.1:
-                if item[0] in svocabulary and item[1] in tvocabulary:
-                    dice2f.write("{0} {1} {2}\n".format(svocabulary[item[0]], tvocabulary[item[1]], item[2]))
-
-        for line in t3s:
-            item = line.strip().split(" ")
-            value = float(item[2])
-            if value > 0.1:
-                if item[1] in svocabulary and item[0] in tvocabulary:
-                    dicf2e.write("{0} {1} {2}\n".format(tvocabulary[item[0]], svocabulary[item[1]], item[2]))
-        svcb.close()
-        tvcb.close()
-        t3s.close()
-        t3t.close()
-        dice2f.close()
-        dicf2e.close()
-        os.sync()
-
-rule train_bicleaner:
-    input:
-        corpusl1 = expand("{dataset}.{lang}.xz", dataset=BICLEANER_TRAIN_PREFIXES, lang=LANG1),
-        corpusl2 = expand("{dataset}.{lang}.xz", dataset=BICLEANER_TRAIN_PREFIXES, lang=LANG2),
-        e2f = f"{DIC}.lex.e2f.gz",
-        f2e = f"{DIC}.lex.f2e.gz"
-    output:
-        f"{BICLEANER_CONFIG}"
-    shell:
-        "training=$(mktemp {TMP_DIR}/train.XXXXXXXX); "
-        "paste <(xzcat -f {input.corpusl1}) <(xzcat -f {input.corpusl2}) > $training; "
-        "DIR=$(dirname {BICLEANER_CONFIG}); "
-        "echo $DIR; "
-        "lines=$(cat $training | wc -l); "
-        "trainlines=$(echo \"$lines*4/10\" | bc); "
-        "testlines=$(echo \"($lines-2*$trainlines)/2\" | bc); "
-        '{PROFILING} python3  {BICLEANER}/bicleaner/bicleaner_train.py $training -S "{WORDTOK1}" -T "{WORDTOK2}" --treat_oovs --normalize_by_length -s {LANG1} -t {LANG2} -d {input.e2f} -D {input.f2e} -c $DIR/{LANG1}-{LANG2}.classifier -g $trainlines -w $trainlines --good_test_examples $testlines --wrong_test_examples $testlines -m {BICLEANER_CONFIG} --classifier_type random_forest; '
-        "rm $training"

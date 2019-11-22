@@ -9,6 +9,7 @@ moses: /root/mosesdecoder
 mgiza: /root/mgiza
 mkcls: /root/clustercat/bin/mkcls
 bicleaner: /root/bicleaner
+zipporah: /root/zipporah
 
 hunalign: /root/hunalign
 hunalignDic: /data/bitextor/dic_data/hunalign.en-ja.dic
@@ -46,13 +47,13 @@ hosts: ["yotsutake.co.jp"]
 task: [
 #    "build_bidic",
 #    "build_hunalign_dic",
-    'train_bicleaner',
+#    'train_bicleaner',
 #    "concat",
 #    "preprocessing",
 #    "align-document",
     #    "align-paragraph",
     #    "align-sentence",
-    #    "filtering",
+    "filtering",
 ]
 
 disableFTFY: false
@@ -80,13 +81,20 @@ documentAligner: URL
 sentenceAligner: LASER
 #sentenceAligner: HUNALIGN
 
-bicleanerConfig: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
-bicleanerThreshold: 0.4
-bicleanerCorpusTrainingPrefix: [
-    "/data/bitextor/dic_data/GlobalVoices/GlobalVoices.en-jp",
-    #    "/data/bitextor/dic_data/OpenSubtitles/OpenSubtitles.en-ja",
-    #    "/data/bitextor/dic_data/Tatoeba/Tatoeba.en-ja",
-]
+#filter: BICLEANER
+#bicleanerConfig: /data/bitextor/bicleaner-model/en-ja/training.en-ja.yaml
+#bicleanerThreshold: 0.4
+
+filter: ZIPPORAH
+zipporahDir: "/data/bitextor/model/zipporah"
+zipporahConfig: "/data/bitextor/model/zipporah/config"
+zipporahModel: "/data/bitextor/model/zipporah/en-ja.model"
+zipporahDic1: "/data/bitextor/model/zipporah/dict.en-ja"
+zipporahDic2: "/data/bitextor/model/zipporah/dict.ja-en"
+zipporahVocab1: "/data/bitextor/model/zipporah/vocab.en"
+zipporahVocab2: "/data/bitextor/model/zipporah/vocab.ja"
+zipporahLM1: "/data/bitextor/model/zipporah/lm.en"
+zipporahLM2: "/data/bitextor/model/zipporah/lm.ja"
 
 bifixer: false
 
