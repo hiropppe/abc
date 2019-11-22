@@ -239,6 +239,7 @@ elif FILTER == "ZIPPORAH":
     ZIPO_VOCAB2 = config["zipporahVocab2"]
     ZIPO_LM1 = config["zipporahLM1"]
     ZIPO_LM2 = config["zipporahLM2"]
+    ZIPO_THRESHOLD = config["zipporahThreshold"]
 else:
     FILTER_SUFFIX = ""
 
@@ -324,9 +325,7 @@ if "align-sentence" in TASK_LIST:
 
 if "filtering" in TASK_LIST:
     for tld in domainkey2hosts.keys():
-        FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/zipporah.score")
         FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz")
-        #FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz")
 
 
 print(BUILD_OUTPUT)
@@ -594,7 +593,7 @@ rule bicleaner_filter:
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.bic.xz'
     shell:
-        'xzcat -T 0 -f {input} | {PROFILING} ./scripts/filter_bicleaner.py --threshold {BICLEANER_THRESHOLD} | xz -T 0 > {output}'
+        'xzcat -T 0 -f {input} | {PROFILING} ./scripts/filter.py --threshold {BICLEANER_THRESHOLD} | xz -T 0 > {output}'
 
 rule zipporah_trans_score:
     input:
@@ -659,11 +658,18 @@ rule zipporah:
         X = f"{TRANSIENT_DIR}/{{target}}/zipporah.feats",
     output:
         y = f"{TRANSIENT_DIR}/{{target}}/zipporah.score",
-        zipp = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz'
+        zipp = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score.xz'
     shell:
         'python ./scripts/zipporah.py predict {input.X} {ZIPO_MODEL} {output.y};'
         'paste <(xzcat -T 0 {input.bitext}) {output.y} | xz -T 0 > {output.zipp};'
 
+rule zipporah_filter:
+    input:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score.xz'
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.xz'
+    shell:
+        'xzcat -T 0 -f {input} | {PROFILING} ./scripts/filter.py --threshold {ZIPO_THRESHOLD} | xz -T 0 > {output}'
 
 # ================================= TRAIN BILINGUAL DICTIONARIES ================================= #
 

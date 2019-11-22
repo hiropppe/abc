@@ -164,20 +164,19 @@ rule test_dict:
         dev2 = f"{PPROC_DIR}/dev.{LANG2}",
         dic1 = f"{ALIGN_DIR}/dict.{LANG1}-{LANG2}",
         dic2 = f"{ALIGN_DIR}/dict.{LANG2}-{LANG1}",
-    params:
-        dev2_shuf = f"{PPROC_DIR}/dev.shuf.{LANG2}"
     output:
+        dev2_shuf = f"{PPROC_DIR}/dev.shuf.{LANG2}",
         xent_good1 = f"{ALIGN_DIR}/good.{LANG1}-{LANG2}.xent",
         xent_good2 = f"{ALIGN_DIR}/good.{LANG2}-{LANG1}.xent",
         xent_bad1 = f"{ALIGN_DIR}/bad.{LANG1}-{LANG2}.xent",
         xent_bad2 = f"{ALIGN_DIR}/bad.{LANG2}-{LANG1}.xent",
     shell:
-        'cat {input.dev2} | {ZIPPORAH}/scripts/shuf.sh > {params.dev2_shuf};'
+        'cat {input.dev2} | {ZIPPORAH}/scripts/shuf.sh > {output.dev2_shuf};'
 
         '{ZIPPORAH}/tools/generate-bow-xent {input.dic2} {input.dev2} {input.dev1} {ZIPO_BOW_CONSTANT} > {output.xent_good2};'
         '{ZIPPORAH}/tools/generate-bow-xent {input.dic1} {input.dev1} {input.dev2} {ZIPO_BOW_CONSTANT} > {output.xent_good1};'
-        '{ZIPPORAH}/tools/generate-bow-xent {input.dic2} {params.dev2_shuf} {input.dev1} {ZIPO_BOW_CONSTANT} > {output.xent_bad2};'
-        '{ZIPPORAH}/tools/generate-bow-xent {input.dic1} {input.dev1} {params.dev2_shuf} {ZIPO_BOW_CONSTANT} > {output.xent_bad1};'
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic2} {output.dev2_shuf} {input.dev1} {ZIPO_BOW_CONSTANT} > {output.xent_bad2};'
+        '{ZIPPORAH}/tools/generate-bow-xent {input.dic1} {input.dev1} {output.dev2_shuf} {ZIPO_BOW_CONSTANT} > {output.xent_bad1};'
 
         "paste {ALIGN_DIR}/good.*.xent | awk '{{print $1+$2}}' > {ALIGN_DIR}/good.xent;"
         "paste {ALIGN_DIR}/bad.*.xent | awk '{{print $1+$2}}' > {ALIGN_DIR}/bad.xent;"
@@ -191,6 +190,7 @@ rule prepare_bad_dev:
     input:
         dev1 = f"{PPROC_DIR}/dev.{LANG1}",
         dev2 = f"{PPROC_DIR}/dev.{LANG2}",
+        dev2_shuf = f"{PPROC_DIR}/dev.shuf.{LANG2}"
     output:
         dev_shufw1 = f"{PPROC_DIR}/dev.shufwords.{LANG1}",
         dev_shufw2 = f"{PPROC_DIR}/dev.shufwords.{LANG2}",
@@ -200,8 +200,8 @@ rule prepare_bad_dev:
         bad1 = f"{FEAT_DIR}/dev.bad.{LANG1}",
         bad2 = f"{FEAT_DIR}/dev.bad.{LANG2}",
     shell:
-        'cat {input.dev1} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG1};'
-        'cat {input.dev2} | python {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG2};'
+        'cat {input.dev1} | python2 {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG1};'
+        'cat {input.dev2} | python2 {ZIPPORAH}/scripts/shuffle-within-lines.py > {PPROC_DIR}/dev.shufwords.{LANG2};'
         'cat {PPROC_DIR}/dev.shufwords.{LANG2} | {ZIPPORAH}/scripts/shuf.sh > {PPROC_DIR}/dev.shufboth.{LANG2};'
 
         # good fluency bad adequacy
