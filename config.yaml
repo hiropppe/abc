@@ -28,16 +28,17 @@ lang2: ja
 
 #hosts: ["yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
+hosts: ["www.asiabiomass.jp"]
 #hosts: ["akisuzuki.com"]
 #hosts: ["www.accorhotels.com"]
 #hosts: ["takagi-j.com"]
-hosts: ["www.musha.co.jp"]
+#hosts: ["www.musha.co.jp"]
 
 task: [
     "concat",
     "preprocessing",
     "align-document",
-    #    "align-paragraph",
+    "align-paragraph",
     "align-sentence",
     "filtering",
 ]
@@ -60,12 +61,12 @@ langId: cld2
 
 documentAligner: URL
 
-#paragraphAligner: STRAND
+paragraphAligner: STRAND
 
-#sentenceAligner: HUNALIGN
-sentenceAligner: LASER
+sentenceAligner: HUNALIGN
+#sentenceAligner: LASER
 
-filter: BICLEANER
+#filter: BICLEANER
 #filter: ZIPPORAH
 
 laser_model_dir: /root/LASER/models

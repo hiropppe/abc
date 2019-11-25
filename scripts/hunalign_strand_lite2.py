@@ -3,7 +3,6 @@
 import numpy as np
 import click
 import os
-import base64
 import subprocess
 
 from tempfile import NamedTemporaryFile
@@ -33,7 +32,8 @@ def align(doc,
         cost = float(line[4])
         data.append((src_seq, src_text, tgt_seq, tgt_text, cost))
 
-    remain = []
+    src_sents_batch = []
+    tgt_sents_batch = []
     for i, each_data in enumerate(data):
         cost = float(each_data[4])
 
@@ -44,29 +44,18 @@ def align(doc,
             src_sents = sent_tokenize(src_text, src_senttok)
             tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
 
+            assert len(src_sents) > 0 and len(tgt_sents) > 0
+
             if len(src_sents) == len(tgt_sents) == 1:
                 print(f"{url1}\t{url2}\t{src_sents[0]}\t{tgt_sents[0]}\t1.0")
-            elif len(src_sents) + len(tgt_sents) > 2:
-                align_paragraph(src_sents, tgt_sents, src_wordtok,
-                                tgt_wordtok, url1, url2, hundir, hundic, tmp_dir)
-        else:
-            remain.append(each_data)
+            else:
+                src_sents_batch.extend(src_sents)
+                tgt_sents_batch.extend(tgt_sents)
+                src_sents_batch.append("GAP")
+                tgt_sents_batch.append("GAP")
 
-    if loosy:
-        batch_align(remain, url1, url2, src_senttok, tgt_senttok,
-                    src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
-    else:
-        if len(remain) <= batch_size:
-            batch_align(remain, url1, url2, src_senttok, tgt_senttok,
-                        src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
-        else:
-            n_gaps = len(remain)//batch_size
-            seq = [int(r[0]) for r in remain]
-            seq2idx = {int(r[0]): i for i, r in enumerate(remain)}
-            for batch_indices in generate_batch(seq, n_gaps):
-                batch = [remain[seq2idx[b]] for b in batch_indices]
-                batch_align(batch, url1, url2, src_senttok, tgt_senttok,
-                            src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
+    align_paragraph(src_sents_batch, tgt_sents_batch, src_wordtok, tgt_wordtok,
+                    url1, url2, hundir, hundic, tmp_dir)
 
 
 def align_paragraph(src_sents, tgt_sents, src_wordtok, tgt_wordtok, url1, url2, hundir, hundic, tmp_dir):
@@ -213,8 +202,9 @@ def hunalign(file1, file2, file1orig, file2orig, filename1, filename2, hundir, h
             for i in range((int(hunalign_fields[1]) - int(prev_fields[1])) - 1):
                 line2 += " " + filereader2.readline().strip()
 
-        print("{0}\t{1}\t{2}\t{3}\t{4}".format(filename1, filename2,
-                                               line1, line2, prev_fields[2].decode("utf8")))
+        if not line1 == line2 == "<GAP>":
+            print("{0}\t{1}\t{2}\t{3}\t{4}".format(filename1, filename2,
+                                                   line1, line2, prev_fields[2].decode("utf8")))
 
         prev_hun = hun_line
 

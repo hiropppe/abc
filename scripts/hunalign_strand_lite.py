@@ -33,40 +33,21 @@ def align(doc,
         cost = float(line[4])
         data.append((src_seq, src_text, tgt_seq, tgt_text, cost))
 
-    remain = []
     for i, each_data in enumerate(data):
         cost = float(each_data[4])
 
+        src_text = each_data[1]
+        tgt_text = each_data[3]
+
+        src_sents = sent_tokenize(src_text, src_senttok)
+        tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
+
         if cost < cost_threshould:
-            src_text = each_data[1]
-            tgt_text = each_data[3]
-
-            src_sents = sent_tokenize(src_text, src_senttok)
-            tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
-
             if len(src_sents) == len(tgt_sents) == 1:
                 print(f"{url1}\t{url2}\t{src_sents[0]}\t{tgt_sents[0]}\t1.0")
             elif len(src_sents) + len(tgt_sents) > 2:
                 align_paragraph(src_sents, tgt_sents, src_wordtok,
                                 tgt_wordtok, url1, url2, hundir, hundic, tmp_dir)
-        else:
-            remain.append(each_data)
-
-    if loosy:
-        batch_align(remain, url1, url2, src_senttok, tgt_senttok,
-                    src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
-    else:
-        if len(remain) <= batch_size:
-            batch_align(remain, url1, url2, src_senttok, tgt_senttok,
-                        src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
-        else:
-            n_gaps = len(remain)//batch_size
-            seq = [int(r[0]) for r in remain]
-            seq2idx = {int(r[0]): i for i, r in enumerate(remain)}
-            for batch_indices in generate_batch(seq, n_gaps):
-                batch = [remain[seq2idx[b]] for b in batch_indices]
-                batch_align(batch, url1, url2, src_senttok, tgt_senttok,
-                            src_wordtok, tgt_wordtok, hundir, hundic, tmp_dir)
 
 
 def align_paragraph(src_sents, tgt_sents, src_wordtok, tgt_wordtok, url1, url2, hundir, hundic, tmp_dir):
@@ -95,10 +76,8 @@ def align_paragraph(src_sents, tgt_sents, src_wordtok, tgt_wordtok, url1, url2, 
         tmp2.close()
         tmp2_tok.close()
 
-        is_good = hunalign(tmp1_tok.name, tmp2_tok.name, tmp1.name,
-                           tmp2.name, url1, url2, hundir, hundic)
-
-        return is_good
+        hunalign(tmp1_tok.name, tmp2_tok.name, tmp1.name,
+                 tmp2.name, url1, url2, hundir, hundic)
 
     finally:
         try:

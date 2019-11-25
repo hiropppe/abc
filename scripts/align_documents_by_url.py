@@ -65,7 +65,7 @@ l2_texts = read(options.text2)
 
 re_l1_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang1))), flags=re.IGNORECASE)
 re_l2_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang2))), flags=re.IGNORECASE)
-re_sla2 = re.compile("(?<!:)//")
+re_sla2 = re.compile("/{2,}")
 re_del = re.compile("[-_~]")
 
 
@@ -79,7 +79,7 @@ def match_url(l1_url, l2_url):
     l2_path = l2_parsed.path
 
     if (l1_netloc != l2_netloc and l1_path == l2_path) \
-            or re_del.sub("", re_l1_lang.sub("", l1_path)) == re_del.sub("", re_l2_lang.sub("", l2_path)):
+            or re_del.sub("", re_sla2.sub("/", re_l1_lang.sub("", l1_path))) == re_del.sub("", re_sla2.sub("/", re_l2_lang.sub("", l2_path))):
         return True
     else:
         return False
