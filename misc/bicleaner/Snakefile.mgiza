@@ -10,8 +10,8 @@ MGIZA = "/root/mgiza"
 MKCLS = "/root/mgiza/mgizapp/bin/mkcls"
 BICLEANER = "/root/bicleaner"
 
-PPROC_CORPUS_DIR = "/data/bitextor/build/temppproc"
-MGIZA_MODEL_DIR = "/data/bitextor/build/tempgiza"
+PPROC_CORPUS_DIR = "/data/bitextor/work/temppproc"
+MGIZA_MODEL_DIR = "/data/bitextor/work/tempgiza"
 TMP_DIR = "/tmp"
 
 PROFILING = ""
@@ -212,14 +212,14 @@ rule train_bicleaner:
         "testlines=$(echo \"($lines-2*$trainlines)/2\" | bc); "
 
         '{PROFILING} python3 {BICLEANER}/bicleaner/bicleaner_train.py $training'
-        '-S "{WORDTOK1}" -T "{WORDTOK2}"'
-        '--treat_oovs --normalize_by_length'
-        '-s {LANG1} -t {LANG2}'
-        '-d {input.e2f} -D {input.f2e}'
-        '-c {output.classfier}'
-        '-g $trainlines -w $trainlines'
-        '--good_test_examples $testlines --wrong_test_examples $testlines'
-        '-m {output.config}'
-        '--classifier_type random_forest; '
+        ' -S "{WORDTOK1}" -T "{WORDTOK2}"'
+        ' --treat_oovs --normalize_by_length'
+        ' -s {LANG1} -t {LANG2}'
+        ' -d {input.e2f} -D {input.f2e}'
+        ' -c {output.classfier}'
+        ' -g $trainlines -w $trainlines'
+        ' --good_test_examples $testlines --wrong_test_examples $testlines'
+        ' -m {output.config}'
+        ' --classifier_type random_forest; '
 
         'rm $training;'

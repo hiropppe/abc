@@ -9,8 +9,9 @@ MKCLS = "/root/mgiza/mgizapp/bin/mkcls"
 BIFIXER = "/root/bifixer"
 BICLEANER = "/root/bicleaner"
 
-PPROC_CORPUS_DIR = "/data/bitextor/build/temppproc"
-MOSES_MODEL_DIR = "/data/bitextor/build/tempmoses"
+WORK_DIR = "/data/bitextor/work"
+PPROC_CORPUS_DIR = "/data/bitextor/work/temppproc"
+MOSES_MODEL_DIR = "/data/bitextor/work/model"
 
 PROFILING = ""
 
@@ -93,7 +94,7 @@ rule moses:
         f"{MOSES_MODEL_DIR}/lex.e2f",
         f"{MOSES_MODEL_DIR}/lex.f2e"
     shell:
-        '{MOSES}/scripts/training/train-model.perl --alignment grow-diag-final-and --root-dir . --corpus {PPROC_CORPUS_DIR}/corpus.clean -e en -f ja --mgiza -mgiza-cpus=16 --parallel --first-step 1 --last-step 4 --external-bin-dir {MGIZA}/mgizapp/bin'
+        '{MOSES}/scripts/training/train-model.perl --alignment grow-diag-final-and --root-dir {WORK_DIR} --corpus {PPROC_CORPUS_DIR}/corpus.clean -e en -f ja --mgiza -mgiza-cpus=16 --parallel --first-step 1 --last-step 4 --external-bin-dir {MGIZA}/mgizapp/bin'
 
 # awk '{print $2" " $1" " $3}' model/lex.e2f > model/lex.e2f_2 && mv model/lex.e2f_2 model/lex.e2f && awk '{print $2" " $1" " $3}' model/lex.f2e > model/lex.f2e_2 && mv model/lex.f2e_2 model/lex.f2e
 # gzip model/lex.e2f -c > dict-en.gz

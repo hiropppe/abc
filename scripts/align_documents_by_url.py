@@ -42,9 +42,9 @@ options = oparser.parse_args()
 
 def more_codes(lang):
     if lang == "ja":
-        return ("ja", "jp", "jpn", "japanese", "japan")
+        return ("ja", "jp", "jpn", "japanese", "japan", "j")
     if lang == "en":
-        return ("en", "us", "eng", "english", "usa")
+        return ("en", "us", "eng", "english", "usa", "e")
     return (lang,)
 
 
@@ -62,43 +62,24 @@ l2_urls = read(options.url2)
 l1_texts = read(options.text1)
 l2_texts = read(options.text2)
 
-re_l1_lang = re.compile(r"\b({:s})\b".format("|".join(more_codes(options.lang1))))
-re_l2_lang = re.compile(r"\b({:s})\b".format("|".join(more_codes(options.lang2))))
+
+re_l1_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang1))), flags=re.IGNORECASE)
+re_l2_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang2))), flags=re.IGNORECASE)
 re_sla2 = re.compile("(?<!:)//")
+re_del = re.compile("[-_~]")
 
 
 def match_url(l1_url, l2_url):
-    l1_tldextract = tldextract.extract(l1_url)
     l1_parsed = urlparse(l1_url)
-
-    l1_sd = l1_tldextract.subdomain
-    l1_d = l1_tldextract.domain
-    l1_tld = l1_tldextract.suffix
-    l1_schema = l1_parsed.scheme
     l1_netloc = l1_parsed.netloc
     l1_path = l1_parsed.path
-    l1_params = l1_parsed.params
-    l1_query = l1_parsed.query
-    l1_fragment = l1_parsed.fragment
 
-    l2_tldextract = tldextract.extract(l2_url)
     l2_parsed = urlparse(l2_url)
-
-    l2_sd = l2_tldextract.subdomain
-    l2_d = l2_tldextract.domain
-    l2_tld = l2_tldextract.suffix
-    l2_schema = l2_parsed.scheme
     l2_netloc = l2_parsed.netloc
     l2_path = l2_parsed.path
-    l2_params = l2_parsed.params
-    l2_query = l2_parsed.query
-    l2_fragment = l2_parsed.fragment
 
     if (l1_netloc != l2_netloc and l1_path == l2_path) \
-            or any((re_l1_lang.sub(l, l1_url) == l2_url) for l in more_codes(options.lang2)) \
-            or any((re_l2_lang.sub(l, l2_url) == l1_url) for l in more_codes(options.lang1)) \
-            or (re_sla2.sub("/", re_l1_lang.sub("", l1_url)) == l2_url) \
-            or (re_sla2.sub("/", re_l2_lang.sub("", l2_url)) == l1_url):
+            or re_del.sub("", re_l1_lang.sub("", l1_path)) == re_del.sub("", re_l2_lang.sub("", l2_path)):
         return True
     else:
         return False
