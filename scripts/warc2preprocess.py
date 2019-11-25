@@ -29,6 +29,7 @@ import logging
 import lzma
 import mmh3
 import sys
+import neologdn
 
 from boilerpipe.extract import Extractor as ExtrB
 from bs4 import BeautifulSoup
@@ -127,6 +128,8 @@ oparser.add_argument('--langs', dest="langs", default="",
                      help='List of languages to include or ignore (%%): l1,l2,%%l3,%%l4')
 oparser.add_argument('--langid', dest="langid", default="cld2",
                      help="Model used for language detection: cld2 or cld3")
+oparser.add_argument('--neologdn', action='store_true', help='Use neologdn to normalize text',
+                     default=False)
 options = oparser.parse_args()
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
@@ -265,9 +268,14 @@ for record in f:
     else:
         deboiled = text
 
+    if options.neologdn:
+        normed_text = neologdn.normalize(deboiled)
+    else:
+        normed_text = deboiled
+
     # We compute a hash on the HTML (either normalized one or after boilerpipe if enabled):
     # if we get duplicate files we discard them
-    html_hash = mmh3.hash(deboiled, signed=False)
+    html_hash = mmh3.hash(normed_text, signed=False)
     # checking for duplicate content (duplicates are discarded)
     if html_hash in seen_html:
         logging.info("Repeated file:\t" + url)

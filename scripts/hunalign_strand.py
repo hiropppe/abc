@@ -43,12 +43,15 @@ def align(doc,
         tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
 
         is_aligned = False
-        if cost < cost_threshould and \
-                len(src_sents) + len(tgt_sents) > 2 and \
-                0.5 <= len(src_sents)/len(tgt_sents) <= 2.0:
+        if cost < cost_threshould:
+#            0.5 <= len(src_sents)/len(tgt_sents) <= 2.0:
+            if len(src_sents) == len(tgt_sents) == 1:
+                print(f"{url1}\t{url2}\t{src_sents[0]}\t{tgt_sents[0]}\t1.0")
 
-            is_aligned = align_paragraph(src_sents, tgt_sents, src_wordtok,
-                                         tgt_wordtok, url1, url2, hundir, hundic, tmp_dir)
+                is_aligned = True
+            elif len(src_sents) + len(tgt_sents) > 2:
+                is_aligned = align_paragraph(src_sents, tgt_sents, src_wordtok,
+                                             tgt_wordtok, url1, url2, hundir, hundic, tmp_dir)
 
         if not is_aligned:
             remain.append(each_data)

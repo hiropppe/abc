@@ -258,7 +258,7 @@ for record in f:
                 clean_html = text
 
             if options.ftfy:
-                tree = ftfy.fix_text(clean_html, fix_entities=False, fix_character_width=False)
+                tree = ftfy.fix_text(clean_html, fix_entities=False, fix_character_width=True)
             else:
                 tree = clean_html
 

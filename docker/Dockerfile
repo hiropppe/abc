@@ -16,7 +16,7 @@ RUN apt-get update \
   && dpkg-reconfigure -f noninteractive tzdata
 
 RUN apt-get update && \
-    apt-get install -y software-properties-common build-essential cmake pkg-config \
+    apt-get install -y software-properties-common build-essential cmake pkg-config autoconf \
         vim wget bzip2 unzip less tree bc \
         libboost-all-dev liblzma-dev liblbfgs-dev \
         openjdk-8-jdk pdftohtml \
@@ -53,6 +53,7 @@ RUN /opt/conda/bin/pip install ipykernel jedi flake8 autopep8 tqdm \
         cchardet==2.1.4 \
         python-magic==0.4.15 \
         ftfy==5.6 \
+        neologdn \
         jpype1==0.7.0 \
         alcazar==0.5.1 \
         selectolax==0.2.1 \
@@ -124,6 +125,16 @@ WORKDIR $LASER
 #RUN /bin/bash ./install_external_tools.sh
 RUN mkdir -p ./tools-external/mecab/bin && \
     ln -s /usr/local/bin/mecab /root/LASER/tools-external/mecab/bin/mecab
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protobuf-all-3.9.1.tar.gz && \
+    tar xzf protobuf-all-3.9.1.tar.gz && \
+    cd protobuf-3.9.1 && \
+    ./configure && \
+    make && \
+    make check && \
+    make install && \
+    ldconfig && \
+    pip install git+https://github.com/iamthebot/cld3
 
 WORKDIR /root
 

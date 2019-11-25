@@ -46,7 +46,7 @@ ZIPO_TRANSLATION_NUM_JOBS = 50
 
 ZIPO_MODEL = f"{TRAIN_DIR}/{LANG1}-{LANG2}.model"
 
-DEPLOY_DIR = "/data/bitextor/model/zipporah"
+DEPLOY_DIR = f"/data/bitextor/model/zipporah/{LANG1}-{LANG2}"
 
 OUTPUT = [
 #    ZIPO_MODEL

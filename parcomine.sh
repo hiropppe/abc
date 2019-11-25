@@ -4,7 +4,7 @@ ONLY_NEW_HOSTS="False"
 HOSTFILE=""
 DELETE=""
 
-ARGS=$(getopt -o s:c:j:h:d -- "$@")
+ARGS=$(getopt -o s:c:j:h:F -- "$@")
 eval set -- "${ARGS}"
 for i
 do
@@ -29,8 +29,8 @@ do
       HOSTFILE="$1"
       shift
       ;;
-    -d )
-      DELETE="--delete-all-output"
+    -F )
+      FORCE_ALL="-F"
       ;;
     --)
       shift
@@ -39,8 +39,4 @@ do
   esac
 done
 
-if [ -n "$DELETE" ]; then
-    snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" --config hostsFile="${HOSTFILE}" --config onlyNewHosts="${ONLY_NEW_HOSTS}" --delete-all-output
-fi
-
-snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" -j "${NUMJOBS}" --config hostsFile="${HOSTFILE}" --config onlyNewHosts="${ONLY_NEW_HOSTS}" --keep-going
+snakemake --snakefile Snakefile --configfile "${CONFIGFILE}" -j "${NUMJOBS}" --config hostsFile="${HOSTFILE}" --config onlyNewHosts="${ONLY_NEW_HOSTS}" --keep-going ${FORCE_ALL}

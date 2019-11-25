@@ -9,8 +9,8 @@ MKCLS = "/root/mgiza/mgizapp/bin/mkcls"
 BIFIXER = "/root/bifixer"
 BICLEANER = "/root/bicleaner"
 
-PPROC_CORPUS_DIR = "pproc"
-MOSES_MODEL_DIR = "model"
+PPROC_CORPUS_DIR = "/data/bitextor/build/temppproc"
+MOSES_MODEL_DIR = "/data/bitextor/build/tempmoses"
 
 PROFILING = ""
 
@@ -18,18 +18,18 @@ WORDTOK1 = "/root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en"
 WORDTOK2 = "mecab -Owakati"
 
 DICT_CORPUS_PREFIXES = [
-    "OpenSubtitles",
-    "Tatoeba",
+    "/data/bitextor/corpus/OpenSubtitles",
+    "/data/bitextor/corpus/Tatoeba",
 ]
 
 BICLEANER_CORPUS_PREFIXES = [
-    "GlobalVoices",
-    "EUbookshop",
+    "/data/bitextor/corpus/GlobalVoices",
+    "/data/bitextor/corpus/EUbookshop",
 ]
 
 DIC = f"{LANG1}-{LANG2}.dic"
-BICLEANER_CLASSIFIER = f"{LANG1}-{LANG2}.classifier"
-BICLEANER_CONFIG = f"{LANG1}-{LANG2}.yaml"
+BICLEANER_CLASSIFIER = f"bicleaner.{LANG1}-{LANG2}.classifier"
+BICLEANER_CONFIG = f"bicleaner.{LANG1}-{LANG2}.yaml"
 
 OUTPUT = [
     BICLEANER_CONFIG,
