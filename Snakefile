@@ -432,10 +432,20 @@ rule stranded_hunalign:
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.srd.hun.xz.temp'
     shell:
-        '{PROFILING} ./scripts/hunalign_strand.py {input.ann} {input.bitext} -ha {HUNALIGN}/src/hunalign -dic {HUNALIGN_DIC} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" -w1 "{WORDTOK1}" -w2 "{WORDTOK2}" -t {TMP_DIR} | xz -T 0 > {output}'
+        '{PROFILING} ./scripts/hunalign_strand_lite.py {input.ann} {input.bitext} -ha {HUNALIGN}/src/hunalign -dic {HUNALIGN_DIC} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" -w1 "{WORDTOK1}" -w2 "{WORDTOK2}" -t {TMP_DIR} | xz -T 0 > {output}'
 
 # ================================== SEGMENT ALIGNMENT (HUNALIGN) ================================== #
 
+rule hunalign:
+    input:
+        dic = f'{HUNALIGN_DIC}',
+        docalign = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz",
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.ind.xz'
+    shell:
+        'xzcat -T 0 {input.docalign} | ./scripts/hunalign_old.py -d {input.dic} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir "{HUNALIGN}/src/hunalign" --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" --word-tokeniser_sl "{WORDTOK1}" --word-tokeniser_tl "{WORDTOK2}" | xz -T 0 > {output};'
+
+"""
 rule prepare_hunalign:
     input:
         indices = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz',
@@ -458,7 +468,7 @@ rule hunalign:
         temp(f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.ind.xz')
     shell:
         '{PROFILING} xzcat -T 0 {input.docalign} | ./scripts/hunalign.py -d {HUNALIGN_DIC} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir {HUNALIGN}/src/hunalign --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" | xz -T 0 > {output};'
-
+"""
 # ================================== POST SEGMENT ALIGNMENT ================================== #
 
 rule indices2url:
