@@ -331,7 +331,7 @@ rule warc2preprocess:
         '    echo "WARNING: no \'$lang\' data found in {wildcards.domain}. Creating empty files instead";'
         '    mkdir -p {params.folder}/$lang;'
         '    touch {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
-        '    xz {params.folder}/$lang/*;'
+        '    xz -f {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
         '  fi ; '
         'done'
 
@@ -438,12 +438,11 @@ rule stranded_hunalign:
 
 rule hunalign:
     input:
-        dic = f'{HUNALIGN_DIC}',
         docalign = f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz",
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.hun.ind.xz'
     shell:
-        'xzcat -T 0 {input.docalign} | ./scripts/hunalign_old.py -d {input.dic} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir "{HUNALIGN}/src/hunalign" --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" --word-tokeniser_sl "{WORDTOK1}" --word-tokeniser_tl "{WORDTOK2}" | xz -T 0 > {output};'
+        'xzcat -T 0 {input.docalign} | ./scripts/hunalign_old.py -d {HUNALIGN_DIC} -t {TMP_DIR} --lang1 {LANG1} --lang2 {LANG2} --hunalign-dir "{HUNALIGN}/src/hunalign" --sent-tokeniser_sl "{SENTTOK1}" --sent-tokeniser_tl "{SENTTOK2}" --word-tokeniser_sl "{WORDTOK1}" --word-tokeniser_tl "{WORDTOK2}" | xz -T 0 > {output};'
 
 """
 rule prepare_hunalign:
