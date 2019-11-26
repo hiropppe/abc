@@ -28,11 +28,37 @@ lang2: ja
 
 #hosts: ["yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
-hosts: ["www.asiabiomass.jp"]
+#hosts: ["www.asiabiomass.jp"]
 #hosts: ["akisuzuki.com"]
 #hosts: ["www.accorhotels.com"]
 #hosts: ["takagi-j.com"]
 #hosts: ["www.musha.co.jp"]
+#hosts: ["www.teijin.co.jp", "www.teijin.com"]
+##hosts: ["www.yamaha.com"]
+#hosts: ["yemen.jp"]
+#hosts: ["okinawa2go.jp", "en.okinawa2go.jp"]
+#hosts: ["blog.tokyosharehouse.com"]
+#hosts: ["www.nesic.co.jp"]
+#hosts: ["www.bostonscientific.com"]
+#hosts: ["cwaj.org"]
+#hosts: ["www.saa-safe.org"]
+##hosts: ["corporate.evonik.jp"]
+#hosts: ["www.spielzeug-welten-museum-basel.ch"]
+#hosts: ["www.sekisuimedical.jp"]
+##hosts: ["ww1.issa.int"]
+##hosts: ["www.hijapan.info"]
+#hosts: ["www.praemiumimperiale.org"]
+#hosts: ["www.ntt.co.jp"]
+#hosts: ["www.inter-bee.com"]
+#hosts: ["yokohama.mylifehouse.com"]
+#hosts: ["www.cstf.kyushu-u.ac.jp"]
+#hosts: ["www.roots-web.jp"]
+#hosts: ["kiua.kyotoiu.ac.jp"]
+#hosts: ["www.sfc.itc.keio.ac.jp"]
+#hosts: ["www.jbic.go.jp"]
+hosts: ["www.wien.info"]
+#hosts: ["www.bewith.jp"]
+#hosts: ["www.hataoka.jp"]
 
 task: [
     "concat",
@@ -51,7 +77,7 @@ cleanHTML: true
 
 boilerpipeCleaning: false
 
-pdf-converter: "pdf-extract"
+#pdf-converter: "pdf-extract"
 
 parser: bs4
 
@@ -66,7 +92,7 @@ paragraphAligner: STRAND
 sentenceAligner: HUNALIGN
 #sentenceAligner: LASER
 
-#filter: BICLEANER
+filter: BICLEANER
 #filter: ZIPPORAH
 
 laser_model_dir: /root/LASER/models
