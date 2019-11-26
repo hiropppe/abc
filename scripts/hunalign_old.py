@@ -37,7 +37,8 @@ def run_aligner(filename_s, filename_t, dic, hunaligndir):
             hunalign = [hunaligndir + "/hunalign", "-realign", "/dev/null", filename_s, filename_t]
     else:
         if hunaligndir is None:
-            hunalign = [os.path.dirname(os.path.abspath(__file__)) + "hunalign", dic, filename_s, filename_t]
+            hunalign = [os.path.dirname(os.path.abspath(__file__)) +
+                        "hunalign", dic, filename_s, filename_t]
         else:
             hunalign = [hunaligndir + "/hunalign", dic, filename_s, filename_t]
 
@@ -48,7 +49,8 @@ def run_aligner(filename_s, filename_t, dic, hunaligndir):
 
 
 def run_analyse(morph, text):
-    panalyse = subprocess.Popen(morph, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+    panalyse = subprocess.Popen(morph, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, stdin=subprocess.PIPE)
     morph_stdout, error = panalyse.communicate(input=text)
     if len(error.strip()) == 0:
         morphemes_tokenized_text = re.sub(r"\^", "", re.sub(r"[/<][^$]*\$", "", morph_stdout))
@@ -118,7 +120,8 @@ def align(file1, file2, file1orig, file2orig, dic):
             for i in range((int(hunalign_fields[1]) - int(prev_fields[1])) - 1):
                 line2 += " " + filereader2.readline().strip()
 
-        print("{0}\t{1}\t{2}\t{3}\t{4}".format(filename1, filename2, line1, line2, prev_fields[2].decode("utf8")))
+        print("{0}\t{1}\t{2}\t{3}\t{4}".format(filename1, filename2,
+                                               line1, line2, prev_fields[2].decode("utf8")))
 
         prev_hun = hun_line
 
@@ -151,17 +154,16 @@ oparser.add_argument("--morphanalyser_sl", help="Path to the Apertium's morpholo
                      dest="morphanal1", default=None)
 oparser.add_argument("--morphanalyser_tl", help="Path to the Apertium's morphological analyser for TL to SL",
                      dest="morphanal2", default=None)
-oparser.add_argument("--sent-tokeniser_sl", help="Path to the sentence tokeniser for SL", dest="senttok1", default=None)
-oparser.add_argument("--sent-tokeniser_tl", help="Path to the sentence tokeniser for TL", dest="senttok2", default=None)
-oparser.add_argument("--word-tokeniser_sl", help="Path to the word tokeniser for SL", dest="wordtok1", default=None)
-oparser.add_argument("--word-tokeniser_tl", help="Path to the word tokeniser for TL", dest="wordtok2", default=None)
+oparser.add_argument("--sent-tokeniser_sl",
+                     help="Path to the sentence tokeniser for SL", dest="senttok1", default=None)
+oparser.add_argument("--sent-tokeniser_tl",
+                     help="Path to the sentence tokeniser for TL", dest="senttok2", default=None)
+oparser.add_argument("--word-tokeniser_sl",
+                     help="Path to the word tokeniser for SL", dest="wordtok1", default=None)
+oparser.add_argument("--word-tokeniser_tl",
+                     help="Path to the word tokeniser for TL", dest="wordtok2", default=None)
 
 options = oparser.parse_args()
-
-if options.aligned_docs is None:
-    reader = sys.stdin
-else:
-    reader = open(options.aligned_docs, "r")
 
 if options.aligned_docs is None:
     reader_list = sys.stdin
@@ -191,15 +193,15 @@ for line in reader_list:
         tmp_file1_orig_name = tmp_file1_origtext.name
         tmp_file2_orig_name = tmp_file2_origtext.name
 
-        align(tmp_file1_name, tmp_file2_name, tmp_file1_orig_name, tmp_file2_orig_name, options.dic)
-    except UnicodeDecodeError:
-        traceback.print_exc()
-    finally:
         tmp_file1.close()
         tmp_file1_origtext.close()
         tmp_file2.close()
         tmp_file2_origtext.close()
 
+        align(tmp_file1_name, tmp_file2_name, tmp_file1_orig_name, tmp_file2_orig_name, options.dic)
+    except UnicodeDecodeError:
+        traceback.print_exc()
+    finally:
         os.remove(tmp_file1.name)
         os.remove(tmp_file1_origtext.name)
         os.remove(tmp_file2.name)
