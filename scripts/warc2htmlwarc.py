@@ -219,16 +219,20 @@ for record in f:
 
     # Extract payloads (XML) from non-HTML document formats
     if url[-4:] == ".pdf" or ((record.http_headers is not None and record.http_headers.get_header('Content-Type') is not None) and "application/pdf" in record.http_headers.get_header('Content-Type')):
-        if options.pdfextract:
-            payloads = pdfextract(payload, extractor)
-        else:
-            payloads = pdf2html(payload)
+        continue
+#        if options.pdfextract:
+#            payloads = pdfextract(payload, extractor)
+#        else:
+#            payloads = pdf2html(payload)
     elif url[-4:] == ".odt" or url[-4:] == ".ods" or url[-4:] == ".odp":
-        payloads = openoffice2html(payload)
+        continue
+#        payloads = openoffice2html(payload)
     elif url[-5:] == ".docx" or url[-5:] == ".pptx" or url[-5:] == ".xlsx":
-        payloads = office2html(payload)
+        continue
+#        payloads = office2html(payload)
     elif url[-5:] == ".epub":
-        payloads = epub2html(payload)
+        continue
+#        payloads = epub2html(payload)
     else:
         payloads = [payload]
 
