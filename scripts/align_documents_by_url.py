@@ -72,14 +72,14 @@ re_del = re.compile("[-_~]")
 def match_url(l1_url, l2_url):
     l1_parsed = urlparse(l1_url)
     l1_netloc = l1_parsed.netloc
-    l1_path = l1_parsed.path
+    l1_path_query = l1_parsed.path + l1_parsed.query + "#"
 
     l2_parsed = urlparse(l2_url)
     l2_netloc = l2_parsed.netloc
-    l2_path = l2_parsed.path
+    l2_path_query = l2_parsed.path + l2_parsed.query + "#"
 
-    if (l1_netloc != l2_netloc and l1_path == l2_path) \
-            or re_del.sub("", re_sla2.sub("/", re_l1_lang.sub("", l1_path))) == re_del.sub("", re_sla2.sub("/", re_l2_lang.sub("", l2_path))):
+    if (l1_netloc != l2_netloc and l1_path_query == l2_path_query) \
+            or re_del.sub("", re_sla2.sub("/", re_l1_lang.sub("", l1_path_query))) == re_del.sub("", re_sla2.sub("/", re_l2_lang.sub("", l2_path_query))):
         return True
     else:
         return False
