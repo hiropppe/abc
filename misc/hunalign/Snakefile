@@ -70,11 +70,11 @@ rule lowercase:
 
 rule clean:
     input:
-        f"{{dir}}/corpus.tok.low.{LANG1}",
-        f"{{dir}}/corpus.tok.low.{LANG2}"
+        f"{{prefix}}.tok.low.{LANG1}",
+        f"{{prefix}}.tok.low.{LANG2}"
     output:
-        f"{{dir}}/corpus.clean.{LANG1}",
-        f"{{dir}}/corpus.clean.{LANG2}"
+        f"{{prefix}}.clean.{LANG1}",
+        f"{{prefix}}.clean.{LANG2}"
     shell:
         "{PROFILING} perl {MOSES}/scripts/training/clean-corpus-n.perl {wildcards.prefix}.tok.low {LANG1} {LANG2} {wildcards.prefix}.clean 1 80 {wildcards.prefix}.lines-retained"
 

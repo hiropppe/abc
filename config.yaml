@@ -33,7 +33,7 @@ lang2: ja
 #hosts: ["www.accorhotels.com"]
 #hosts: ["takagi-j.com"]
 #hosts: ["www.musha.co.jp"]
-#hosts: ["www.teijin.co.jp", "www.teijin.com"]
+hosts: ["www.teijin.co.jp", "www.teijin.com"]
 ##hosts: ["www.yamaha.com"]
 #hosts: ["yemen.jp"]
 #hosts: ["okinawa2go.jp", "en.okinawa2go.jp"]
@@ -56,7 +56,7 @@ lang2: ja
 #hosts: ["kiua.kyotoiu.ac.jp"]
 #hosts: ["www.sfc.itc.keio.ac.jp"]
 #hosts: ["www.jbic.go.jp"]
-hosts: ["www.wien.info"]
+#hosts: ["www.wien.info"]
 #hosts: ["www.bewith.jp"]
 #hosts: ["www.hataoka.jp"]
 
@@ -95,15 +95,18 @@ sentenceAligner: HUNALIGN
 filter: BICLEANER
 #filter: ZIPPORAH
 
+strandThreshold: 0.1
+strandDpThreshold: 0.3
+
+hunalignDic: /data/bitextor/model/hunalign/en-ja/hunalign.en-ja.dic
+hunalignThreshold: 0.0
+
 laser_model_dir: /root/LASER/models
 laser_encoder: /root/LASER/models/bilstm.93langs.2018-12-26.pt
 laser_bpe_codes: /root/LASER/models/93langs.fcodes
 laser_threshold: 1.1
 laser_enc_gpu: false
 laser_knn_gpu: false
-
-hunalignDic: /data/bitextor/model/hunalign/en-ja/hunalign.en-ja.dic
-hunalignThreshold: 0.0
 
 bicleanerConfig: /data/bitextor/model/bicleaner/en-ja/bicleaner.en-ja.yaml
 bicleanerThreshold: 0.4

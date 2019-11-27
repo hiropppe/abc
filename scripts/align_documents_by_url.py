@@ -42,9 +42,9 @@ options = oparser.parse_args()
 
 def more_codes(lang):
     if lang == "ja":
-        return ("ja", "jp", "jpn", "japanese", "japan", "j")
+        return ("ja", "jp", "jpn", "japanese", "japan", "j", "lang=ja")
     if lang == "en":
-        return ("en", "us", "eng", "english", "usa", "e")
+        return ("en", "us", "eng", "english", "usa", "e", "lang=en")
     return (lang,)
 
 
@@ -66,7 +66,7 @@ l2_texts = read(options.text2)
 re_l1_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang1))), flags=re.IGNORECASE)
 re_l2_lang = re.compile(r"(?<=[^a-z])({:s})(?=[^a-z])".format("|".join(more_codes(options.lang2))), flags=re.IGNORECASE)
 re_sla2 = re.compile("/{2,}")
-re_del = re.compile("[-_~]")
+re_del = re.compile("[-_~?]")
 
 
 def match_url(l1_url, l2_url):

@@ -3,7 +3,6 @@
 import numpy as np
 import click
 import os
-import base64
 import subprocess
 
 from tempfile import NamedTemporaryFile
@@ -23,24 +22,17 @@ def align(doc,
           loosy,
           batch_size):
 
-    data = []
-    for line in doc:
+    remain = []
+    for i, line in enumerate(doc):
         line = line.split("\t")
         src_seq = int(line[0])
         src_text = line[1]
         tgt_seq = int(line[2])
         tgt_text = line[3]
         cost = float(line[4])
-        data.append((src_seq, src_text, tgt_seq, tgt_text, cost))
-
-    remain = []
-    for i, each_data in enumerate(data):
-        cost = float(each_data[4])
+        each_data = (src_seq, src_text, tgt_seq, tgt_text, cost)
 
         if cost < cost_threshould:
-            src_text = each_data[1]
-            tgt_text = each_data[3]
-
             src_sents = sent_tokenize(src_text, src_senttok)
             tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
 
@@ -166,12 +158,11 @@ def hunalign(file1, file2, file1orig, file2orig, filename1, filename2, hundir, h
     filereader2 = open(file2orig, "r")
 
     hunalign_output = run_hunaligner(file1, file2, hundic, hundir)
+    quality = 0.0
     try:
         prev_hun = next(hunalign_output).strip()
         if prev_hun.startswith(b"Quality "):
             quality = float(prev_hun.split()[1])
-        else:
-            quality = 0.0
 
         prev_hun = next(hunalign_output).strip()
         prev_fields = prev_hun.split(b"\t")
@@ -277,8 +268,8 @@ def run_hunaligner(filename_s, filename_t, dic, hunaligndir):
 @click.option("--word_tokenizer1", "-w1", help="")
 @click.option("--word_tokenizer2", "-w2", help="")
 @click.option("--tmp_dir", "-t", help="")
-@click.option("--dp_threshould", default=0.5, help="")
-@click.option("--cost_threshould", default=0.2, help="")
+@click.option("--dp_threshould", default=0.3, help="")
+@click.option("--cost_threshould", default=0.01, help="")
 @click.option("--loosy", is_flag=True, default=True, help="")
 @click.option("--batch_size", default=10, help="")
 def main(align_ann,

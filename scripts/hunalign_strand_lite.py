@@ -3,7 +3,6 @@
 import numpy as np
 import click
 import os
-import base64
 import subprocess
 
 from tempfile import NamedTemporaryFile
@@ -23,26 +22,17 @@ def align(doc,
           loosy,
           batch_size):
 
-    data = []
-    for line in doc:
+    for i, line in enumerate(doc):
         line = line.split("\t")
-        src_seq = int(line[0])
-        src_text = line[1]
-        tgt_seq = int(line[2])
-        tgt_text = line[3]
         cost = float(line[4])
-        data.append((src_seq, src_text, tgt_seq, tgt_text, cost))
-
-    for i, each_data in enumerate(data):
-        cost = float(each_data[4])
-
-        src_text = each_data[1]
-        tgt_text = each_data[3]
-
-        src_sents = sent_tokenize(src_text, src_senttok)
-        tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
 
         if cost < cost_threshould:
+            src_text = line[1]
+            tgt_text = line[3]
+
+            src_sents = sent_tokenize(src_text, src_senttok)
+            tgt_sents = sent_tokenize(tgt_text, tgt_senttok)
+
             if len(src_sents) == len(tgt_sents) == 1:
                 print(f"{url1}\t{url2}\t{src_sents[0]}\t{tgt_sents[0]}\t1.0")
             elif len(src_sents) + len(tgt_sents) > 2:
@@ -256,8 +246,8 @@ def run_hunaligner(filename_s, filename_t, dic, hunaligndir):
 @click.option("--word_tokenizer1", "-w1", help="")
 @click.option("--word_tokenizer2", "-w2", help="")
 @click.option("--tmp_dir", "-t", help="")
-@click.option("--dp_threshould", default=0.5, help="")
-@click.option("--cost_threshould", default=0.2, help="")
+@click.option("--dp_threshould", default=0.3, help="")
+@click.option("--cost_threshould", default=0.01, help="")
 @click.option("--loosy", is_flag=True, default=True, help="")
 @click.option("--batch_size", default=10, help="")
 def main(align_ann,

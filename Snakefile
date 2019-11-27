@@ -153,6 +153,8 @@ else:
 PALIGN = config.get("paragraphAligner", "").upper()
 if PALIGN == "STRAND":
     PALIGN_SUFFIX = ".srd"
+    STRAND_THRESHOLD = config.get("strandThreshold", 0.01)
+    STRAND_DP_THRESHOLD = config.get("strandDpThreshold", 0.7)
 else:
     PALIGN_SUFFIX = ""
 
@@ -432,7 +434,7 @@ rule stranded_hunalign:
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.srd.hun.xz.temp'
     shell:
-        '{PROFILING} ./scripts/hunalign_strand_lite.py {input.ann} {input.bitext} -ha {HUNALIGN}/src/hunalign -dic {HUNALIGN_DIC} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" -w1 "{WORDTOK1}" -w2 "{WORDTOK2}" -t {TMP_DIR} | xz -T 0 > {output}'
+        '{PROFILING} ./scripts/hunalign_strand.py {input.ann} {input.bitext} -ha {HUNALIGN}/src/hunalign -dic {HUNALIGN_DIC} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" -w1 "{WORDTOK1}" -w2 "{WORDTOK2}" -t {TMP_DIR} --dp_threshould {STRAND_DP_THRESHOLD} --cost_threshould {STRAND_THRESHOLD} | xz -T 0 > {output}'
 
 # ================================== SEGMENT ALIGNMENT (HUNALIGN) ================================== #
 
