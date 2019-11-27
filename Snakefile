@@ -217,7 +217,7 @@ MAX_LINES = int(config.get("maxlines", "-1"))
 # ================================== DETERMINE TARGET HOSTS ================================ #
 
 warc_path = DATA_DIR / "warc"
-#crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
+crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
 crawled_hosts = set()
 print(f"read hosts from warc dir={len(crawled_hosts):d}")
 
