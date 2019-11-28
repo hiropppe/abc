@@ -22,11 +22,25 @@ WORDTOK2 = "mecab -Owakati"
 DICT_CORPUS_PREFIXES = [
     "/data/bitextor/corpus/OpenSubtitles",
     "/data/bitextor/corpus/Tatoeba",
+    "/data/bitextor/corpus/QED",
+    "/data/bitextor/corpus/News-Commentary",
+    "/data/bitextor/corpus/EUbookshop",
+    "/data/bitextor/corpus/GlobalVoices",
+    "/data/bitextor/corpus/JESC",
+    "/data/bitextor/corpus/TED",
+    "/data/bitextor/corpus/KFTT",
 ]
 
 BICLEANER_CORPUS_PREFIXES = [
+    "/data/bitextor/corpus/OpenSubtitles",
+    "/data/bitextor/corpus/Tatoeba",
+    "/data/bitextor/corpus/QED",
+    "/data/bitextor/corpus/News-Commentary",
+    "/data/bitextor/corpus/EUbookshop",
     "/data/bitextor/corpus/GlobalVoices",
-    "/data/bitextor/corpus/EUbookshop"
+    "/data/bitextor/corpus/JESC",
+    "/data/bitextor/corpus/TED",
+    "/data/bitextor/corpus/KFTT",
 ]
 
 DIC = f"/data/bitextor/dic_data/{LANG1}-{LANG2}.dic"
