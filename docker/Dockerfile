@@ -89,8 +89,8 @@ RUN git clone https://github.com/moses-smt/mgiza.git && \
 RUN git clone https://github.com/bitextor/hunalign.git && \
     cd hunalign/src/hunalign && git checkout 8235ea2 && make
 
-RUN git clone https://github.com/kpu/preprocess.git && \
-    cd preprocess && git checkout 2d78e88 && cmake . && make -j4
+#RUN git clone https://github.com/kpu/preprocess.git && \
+#    cd preprocess && git checkout 2d78e88 && cmake . && make -j4
 
 RUN git clone https://github.com/jonsafari/clustercat.git && \
     cd clustercat && git checkout b19f171 && make -j4
@@ -135,6 +135,17 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/pr
     make install && \
     ldconfig && \
     pip install git+https://github.com/iamthebot/cld3
+
+#curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
+#rbenv init
+#echo 'export PATH=/root/.rbenv/bin:$PATH' >> ~/.bashrc
+#echo 'eval "$(rbenv init -)"' >> ~/.bashrc
+#apt-get install -y libssl-dev libreadline-dev
+#rbenv install 2.6.5
+#rbenv rehash
+#gem install rbenv-rehash
+#rbenv global 2.6.5
+#gem install pragmatic_segmenter
 
 WORKDIR /root
 
