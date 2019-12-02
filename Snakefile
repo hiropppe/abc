@@ -217,9 +217,10 @@ else:
 
 MAX_LINES = int(config.get("maxlines", "-1"))
 
+TASK_LIST = config["task"]
+# print(TASK_LIST)
 
 # ================================== DETERMINE TARGET HOSTS ================================ #
-
 warc_path = DATA_DIR / "warc"
 crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
 # crawled_hosts = set()
@@ -237,12 +238,17 @@ if input_hosts:
         hosts = input_hosts - crawled_hosts
     else:
         hosts = input_hosts
+
+    domainkey2hosts = create_domainkey2hosts(hosts)
+    mine_domein = domainkey2hosts.keys()
 else:
     hosts = crawled_hosts
+    domainkey2hosts = create_domainkey2hosts(hosts)
 
-domainkey2hosts = create_domainkey2hosts(hosts)
-
-# print(domainkey2hosts)
+    if len(TASK_LIST) == 1 and TASK_LIST[0] == "finish":
+        mine_domein = [d.name for d in TRANSIENT_DIR.iterdir() if (d / f"bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz").exists()]
+    else:
+        mine_domein = domainkey2hosts.keys()
 
 # ================================== START SNAKEMAKE ================================ #
 OUTPUT = []
@@ -251,9 +257,6 @@ DALIGN_OUTPUT = []
 PALIGN_OUTPUT = []
 SALIGN_OUTPUT = []
 FILTER_OUTPUT = []
-
-TASK_LIST = config["task"]
-# print(TASK_LIST)
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
@@ -624,7 +627,7 @@ rule zipporah_filter:
 
 rule raw:
     input:
-        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=domainkey2hosts.keys())
+        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domein)
     output:
         f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz"
     run:
