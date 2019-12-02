@@ -3,6 +3,7 @@
 import gzip
 import lzma
 import subprocess
+import shutil
 import tldextract
 
 from func_timeout import func_timeout, FunctionTimedOut
@@ -113,9 +114,12 @@ if "plainTextHashes" in config:
 else:
     PLAINTEXTHASHES = ""
 
-if "deduped" in config:
+if config.get("deduped", True):
     DEDUP = '--dedup "seg1,seg2"'
-    BICLEANER_SORT = f"LC_ALL=C sort -t$'\t' -k3,4 -T {TMP_DIR} --compress-program=gzip |"
+    FILTER_SORT = f"LC_ALL=C sort -t$'\t' -k3,4 -T {TMP_DIR} --compress-program=gzip |"
+else:
+    DEDUP = ""
+    FILTER_SORT = ""
 
 SENTTOKS = config["sentenceSplitters"]
 SENTTOK1 = get_lang_or_default_from_dict(config["sentenceSplitters"], LANG1)
@@ -177,7 +181,7 @@ if "bifixer" in config and config["bifixer"]:
     BIFIXER = "bifixer"
     BIFIXERFIELD = ",bifixerhash,bifixerscore"
     CACHEOPTIONS = '-k 6,7'
-    BICLEANER_SORT = ""
+    FILTER_SORT = ""
     DEDUP = '--dedup "bifixerhash"'
 else:
     BIFIXER = "segclean"
@@ -218,7 +222,7 @@ MAX_LINES = int(config.get("maxlines", "-1"))
 
 warc_path = DATA_DIR / "warc"
 crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
-crawled_hosts = set()
+# crawled_hosts = set()
 print(f"read hosts from warc dir={len(crawled_hosts):d}")
 
 input_hosts = None
@@ -238,7 +242,7 @@ else:
 
 domainkey2hosts = create_domainkey2hosts(hosts)
 
-print(domainkey2hosts)
+# print(domainkey2hosts)
 
 # ================================== START SNAKEMAKE ================================ #
 OUTPUT = []
@@ -249,7 +253,7 @@ SALIGN_OUTPUT = []
 FILTER_OUTPUT = []
 
 TASK_LIST = config["task"]
-print(TASK_LIST)
+# print(TASK_LIST)
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
@@ -279,13 +283,22 @@ if "filtering" in TASK_LIST:
     for tld in domainkey2hosts.keys():
         FILTER_OUTPUT.append(f"{TRANSIENT_DIR:}/{tld:s}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz")
 
+if "finish" in TASK_LIST:
+    if config.get("tmx", False):
+        if config.get("deduped", True):
+            OUTPUT.append(f"{PERMANENT_DIR}/{LANG1}-{LANG2}.deduped.tmx.xz")
+            OUTPUT.append(f"{PERMANENT_DIR}/{LANG1}-{LANG2}.deduped.txt.xz")
+        else:
+            OUTPUT.append(f"{PERMANENT_DIR}/{LANG1}-{LANG2}.tmx.xz")
+    else:
+        OUTPUT.append(f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz")
 
 print(OUTPUT)
-print(PPROC_OUTPUT)
-print(DALIGN_OUTPUT)
-print(PALIGN_OUTPUT)
-print(SALIGN_OUTPUT)
-print(FILTER_OUTPUT)
+# print(PPROC_OUTPUT)
+# print(DALIGN_OUTPUT)
+# print(PALIGN_OUTPUT)
+# print(SALIGN_OUTPUT)
+# print(FILTER_OUTPUT)
 
 
 rule all:
@@ -607,3 +620,32 @@ rule zipporah_filter:
     shell:
         '{PROFILING} xzcat -T 0 -f {input} | ./scripts/filter.py --threshold {ZIPO_THRESHOLD} | xz -T 0 > {output}'
 
+# ================================== Finish  ================================== #
+
+rule raw:
+    input:
+        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=domainkey2hosts.keys())
+    output:
+        f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz"
+    run:
+        with open(output[0], 'wb') as wfd:
+            for f in input:
+                with open(f, 'rb') as fd:
+                    shutil.copyfileobj(fd, wfd, 1024*1024*10)
+
+rule tmx:
+    input:
+        f"{PERMANENT_DIR}/{{LANG1}}-{{LANG2}}.raw.xz"
+    output:
+        f"{PERMANENT_DIR}/{{LANG1}}-{{LANG2}}.tmx.xz"
+    shell:
+        "xzcat -T 0 -f {input} | ./scripts/build_tmx.py --lang1 {LANG1} --lang2 {LANG2} -c url1,url2,seg1,seg2 | xz -T 0 > {output.tmx}"
+
+rule deduped_tmx:
+    input:
+        f"{PERMANENT_DIR}/{{LANG1}}-{{LANG2}}.raw.xz"
+    output:
+        tmx = f"{PERMANENT_DIR}/{{LANG1}}-{{LANG2}}.deduped.tmx.xz",
+        txt = f"{PERMANENT_DIR}/{{LANG1}}-{{LANG2}}.deduped.txt.xz"
+    shell:
+        "xzcat -T 0 -f {input} | {FILTER_SORT} ./scripts/build_tmx.py --lang1 {LANG1} --lang2 {LANG2} -c url1,url2,seg1,seg2 {DEDUP} -f {output.txt} | xz -T 0 > {output.tmx}"

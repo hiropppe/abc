@@ -26,14 +26,15 @@ sentenceSplitters: {
 lang1: en
 lang2: ja
 
-#hosts: ["yotsutake.co.jp"]
+hosts: ["ahatoro.com", "yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
+#hosts: ["yotsutake.co.jp"]
 #hosts: ["www.asiabiomass.jp"]
 #hosts: ["akisuzuki.com"]
 #hosts: ["www.accorhotels.com"]
 #hosts: ["takagi-j.com"]
 #hosts: ["www.musha.co.jp"]
-hosts: ["www.teijin.co.jp", "www.teijin.com"]
+#hosts: ["www.teijin.co.jp", "www.teijin.com"]
 ##hosts: ["www.yamaha.com"]
 #hosts: ["yemen.jp"]
 #hosts: ["okinawa2go.jp", "en.okinawa2go.jp"]
@@ -67,6 +68,7 @@ task: [
     "align-paragraph",
     "align-sentence",
     "filtering",
+    "finish",
 ]
 
 crawler: heritrix
