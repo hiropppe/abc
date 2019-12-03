@@ -115,17 +115,6 @@ ENV PATH /opt/conda/bin:$PATH
 RUN git clone https://github.com/hiropppe/strand-aligner.git && \
     cd strand-aligner && make && make install
 
-RUN git clone https://github.com/facebookresearch/LASER.git
-##  RUN git checkout 311b25e  # commit hash when tested
-ENV LASER /root/LASER
-RUN echo "export LASER=$LASER" >> ~/.bashrc
-
-WORKDIR $LASER
-#RUN /bin/bash ./install_models.sh
-#RUN /bin/bash ./install_external_tools.sh
-RUN mkdir -p ./tools-external/mecab/bin && \
-    ln -s /usr/local/bin/mecab /root/LASER/tools-external/mecab/bin/mecab
-
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protobuf-all-3.9.1.tar.gz && \
     tar xzf protobuf-all-3.9.1.tar.gz && \
     cd protobuf-3.9.1 && \
@@ -135,6 +124,12 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/pr
     make install && \
     ldconfig && \
     pip install git+https://github.com/iamthebot/cld3
+
+RUN git clone https://github.com/facebookresearch/fastText.git && \
+    cd fastText && \
+    make && \
+    python setup.py install && \
+    mkdir model && wget -O wget -O model/lid.176.bin https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
 
 #curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 #rbenv init
@@ -146,6 +141,17 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/pr
 #gem install rbenv-rehash
 #rbenv global 2.6.5
 #gem install pragmatic_segmenter
+
+RUN git clone https://github.com/facebookresearch/LASER.git
+##  RUN git checkout 311b25e  # commit hash when tested
+ENV LASER /root/LASER
+RUN echo "export LASER=$LASER" >> ~/.bashrc
+
+WORKDIR $LASER
+#RUN /bin/bash ./install_models.sh
+#RUN /bin/bash ./install_external_tools.sh
+RUN mkdir -p ./tools-external/mecab/bin && \
+    ln -s /usr/local/bin/mecab /root/LASER/tools-external/mecab/bin/mecab
 
 WORKDIR /root
 

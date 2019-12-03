@@ -193,6 +193,17 @@ if "bifixerOptions" in config:
 else:
     BIFIXEROPTIONS = "--aggressive_dedup"
 
+if "miniclean" in config and config["miniclean"]:
+    MINIC_LID = config["minicleanLID"].strip()
+    if ":" in MINIC_LID:
+        MINIC_LID, MINIC_LID_MODEL = MINIC_LID.split(":")
+        MINIC_LID, MINIC_LID_MODEL = MINIC_LID.strip(), MINIC_LID_MODEL.strip()
+    else:
+        MINIC_LID_MODEL = ""
+    MINIC_SUFFIX = ".mc"
+else:
+    MINIC_SUFFIX = ""
+
 FILTER = config.get("filter", "").upper()
 
 if FILTER == "BICLEANER":
@@ -625,9 +636,18 @@ rule zipporah_filter:
 
 # ================================== Finish  ================================== #
 
+rule miniclener:
+    input:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz'
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc.xz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
+    shell:
+        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --err_out {output[1]} | xz -T 0 > {output[0]}'
+
 rule raw:
     input:
-        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domein)
+        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}{MINIC_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domein)
     output:
         f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz"
     run:
