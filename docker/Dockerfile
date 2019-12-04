@@ -131,16 +131,17 @@ RUN git clone https://github.com/facebookresearch/fastText.git && \
     python setup.py install && \
     mkdir model && wget -O wget -O model/lid.176.bin https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
 
-#curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
-#rbenv init
-#echo 'export PATH=/root/.rbenv/bin:$PATH' >> ~/.bashrc
-#echo 'eval "$(rbenv init -)"' >> ~/.bashrc
-#apt-get install -y libssl-dev libreadline-dev
-#rbenv install 2.6.5
-#rbenv rehash
-#gem install rbenv-rehash
-#rbenv global 2.6.5
-#gem install pragmatic_segmenter
+RUN curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
+ENV PATH /root/.rbenv/bin:$PATH
+RUN rbenv init && \
+    echo 'export PATH=/root/.rbenv/bin:$PATH' >> ~/.bashrc && \
+    echo 'eval "$(rbenv init -)"' >> ~/.bashrc && \
+    apt-get install -y libssl-dev libreadline-dev && \
+    rbenv install 2.6.5 && \
+    rbenv rehash && \
+    rbenv global 2.6.5 && \
+    gem install rbenv-rehash && \
+    gem install pragmatic_segmenter
 
 RUN git clone https://github.com/facebookresearch/LASER.git
 ##  RUN git checkout 311b25e  # commit hash when tested
