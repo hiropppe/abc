@@ -645,7 +645,7 @@ rule miniclener:
     params:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
     shell:
-        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --err_out {params} | xz -T 0 > {output}'
+        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --tokenizer1 "{WORDTOK1}" --tokenizer2 "{WORDTOK2}" --err_out {params} | xz -T 0 > {output}'
 
 rule raw:
     input:
