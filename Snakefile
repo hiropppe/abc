@@ -251,15 +251,15 @@ if input_hosts:
         hosts = input_hosts
 
     domainkey2hosts = create_domainkey2hosts(hosts)
-    mine_domein = domainkey2hosts.keys()
+    mine_domain = list(domainkey2hosts.keys())
 else:
     hosts = crawled_hosts
     domainkey2hosts = create_domainkey2hosts(hosts)
 
     if len(TASK_LIST) == 1 and TASK_LIST[0] == "finish":
-        mine_domein = [d.name for d in TRANSIENT_DIR.iterdir() if (d / f"bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz").exists()]
+        mine_domain = [d.name for d in TRANSIENT_DIR.iterdir() if (d / f"bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz").exists()]
     else:
-        mine_domein = domainkey2hosts.keys()
+        mine_domain = domainkey2hosts.keys()
 
 # ================================== START SNAKEMAKE ================================ #
 OUTPUT = []
@@ -641,13 +641,15 @@ rule miniclener:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz'
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc.xz'
+#        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
+    params:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
     shell:
-        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --err_out {output[1]} | xz -T 0 > {output[0]}'
+        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --err_out {params} | xz -T 0 > {output}'
 
 rule raw:
     input:
-        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}{MINIC_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domein)
+        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}{MINIC_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domain)
     output:
         f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz"
     run:
