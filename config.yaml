@@ -18,9 +18,9 @@ wordTokenizers: {
 }
 
 sentenceSplitters: {
-    default: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l en,
-    en: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l en,
-    ja: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l ja,
+    default: /root/abc/scripts/pragmatic_segmenter.rb en,
+    en: /root/abc/scripts/pragmatic_segmenter.rb en,
+    ja: /root/abc/scripts/pragmatic_segmenter.rb ja,
 }
 
 lang1: en
