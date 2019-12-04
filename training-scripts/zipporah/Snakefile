@@ -131,7 +131,7 @@ rule align_corpus:
     output:
         f"{ALIGN_DIR}/alignment"
     shell:
-        '{ZIPPORAH}/scripts/align-corpus.sh {ZIPO_CONFIG} {ZIPO_ALIGNER} {input.train1} {input.train2} {output} {ALIGN_DIR}/tmp'
+        './scripts/align-corpus.sh {ZIPO_CONFIG} {ZIPO_ALIGNER} {input.train1} {input.train2} {output} {ALIGN_DIR}/tmp'
 
 rule align_to_dict:
     input:
