@@ -148,7 +148,7 @@ rule align_to_dict:
 rule prepare_dev_l1:
     input:
         dev = expand("{dataset}.{lang1}-{lang2}.{lang1}.xz", dataset=DEV_PREFIXES, lang1=LANG1, lang2=LANG2),
-        caser = f"{PPROC_DIR}/truecase-model.{LANG2}"
+        caser = f"{PPROC_DIR}/truecase-model.{LANG1}"
     output:
         f"{PPROC_DIR}/dev.{LANG1}"
     params:
