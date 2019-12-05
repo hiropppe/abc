@@ -67,6 +67,7 @@ OUTPUT = [
     f"{DEPLOY_DIR}/vocab.ja",
     f"{DEPLOY_DIR}/lm.en",
     f"{DEPLOY_DIR}/lm.ja",
+    f"{DEPLOY_DIR}/config",
 #    f"{ALIGN_DIR}/dict.en-ja",
 #    f"{ALIGN_DIR}/dict.ja-en",
 #    f"{ALIGN_DIR}/good.en-ja.xent",
@@ -398,6 +399,7 @@ rule deploy:
         vocab2 = f"{DEPLOY_DIR}/vocab.{LANG2}",
         lm1 = f"{DEPLOY_DIR}/lm.{LANG1}",
         lm2 = f"{DEPLOY_DIR}/lm.{LANG2}",
+        config = f"{DEPLOY_DIR}/config",
     shell:
         'cp {input.model} {output.model};'
         'cp {input.dic1} {output.dic1};'
@@ -406,3 +408,4 @@ rule deploy:
         'cp {input.vocab2} {output.vocab2};'
         'cp {input.lm1} {output.lm1};'
         'cp {input.lm2} {output.lm2};'
+        'cp {ZIPO_CONFIG} {output.config};'
