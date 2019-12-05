@@ -565,15 +565,15 @@ rule zipporah_trans_score:
         trans1 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG1}-{LANG2}",
         trans2 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG2}-{LANG1}",
     shell:
-        'tmpfolder={TRANSIENT_DIR}/translation/;'
+        'tmpfolder={TRANSIENT_DIR}/{wildcards.target}/translation/;'
         'mkdir -p $tmpfolder;'
         'rm -rf $tmpfolder;'
         'mkdir -p $tmpfolder;'
 
         'xzcat -T 0 -f {input.data} | awk -F \'\t\' \'BEGIN{{OFS="\t"}} {{print ($3, $4)}}\' > $tmpfolder/pasted;'
 
-        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $1}}\' > $tmpfolder/s.in;'
-        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $2}}\' > $tmpfolder/s.out;'
+        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $1}}\' | {WORDTOK1} > $tmpfolder/s.in;'
+        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $2}}\' | {WORDTOK2} > $tmpfolder/s.out;'
 
         '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.in $tmpfolder/s.out {ZIPO_DIC1} $tmpfolder/out.f2e;'
         '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.out $tmpfolder/s.in {ZIPO_DIC2} $tmpfolder/out.e2f;'
