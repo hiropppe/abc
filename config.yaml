@@ -67,7 +67,7 @@ task: [
     #    "align-document",
     #    "align-paragraph",
     #    "align-sentence",
-    #    "filtering",
+    "filtering",
     "finish",
 ]
 
@@ -95,7 +95,7 @@ sentenceAligner: HUNALIGN
 #sentenceAligner: LASER
 
 #filter: BICLEANER
-#filter: ZIPPORAH
+filter: ZIPPORAH
 
 strandThreshold: 0.1
 strandDpThreshold: 0.3
@@ -113,22 +113,22 @@ laser_knn_gpu: false
 bicleanerConfig: /data/bitextor/model/bicleaner/en-ja/bicleaner.en-ja.yaml
 bicleanerThreshold: 0.4
 
-#zipporahDir: "/data/bitextor/model/zipporah"
-#zipporahConfig: "/data/bitextor/model/zipporah/config"
-#zipporahModel: "/data/bitextor/model/zipporah/en-ja.model"
-#zipporahDic1: "/data/bitextor/model/zipporah/dict.en-ja"
-#zipporahDic2: "/data/bitextor/model/zipporah/dict.ja-en"
-#zipporahVocab1: "/data/bitextor/model/zipporah/vocab.en"
-#zipporahVocab2: "/data/bitextor/model/zipporah/vocab.ja"
-#zipporahLM1: "/data/bitextor/model/zipporah/lm.en"
-#zipporahLM2: "/data/bitextor/model/zipporah/lm.ja"
-#zipporahThreshold: 0.0
+zipporahDir: "/data/bitextor/model/zipporah/en-ja"
+zipporahConfig: "/data/bitextor/model/zipporah/en-ja/config"
+zipporahModel: "/data/bitextor/model/zipporah/en-ja/en-ja.model"
+zipporahDic1: "/data/bitextor/model/zipporah/en-ja/dict.en-ja"
+zipporahDic2: "/data/bitextor/model/zipporah/en-ja/dict.ja-en"
+zipporahVocab1: "/data/bitextor/model/zipporah/en-ja/vocab.en"
+zipporahVocab2: "/data/bitextor/model/zipporah/en-ja/vocab.ja"
+zipporahLM1: "/data/bitextor/model/zipporah/en-ja/lm.en"
+zipporahLM2: "/data/bitextor/model/zipporah/en-ja/lm.ja"
+zipporahThreshold: 0.5
 
 bifixer: false
 
 elrc: false
 
-miniclean: true
+miniclean: false
 minicleanLID: "fastText: /root/fastText/model/lid.176.bin"
 
 tmx: true
