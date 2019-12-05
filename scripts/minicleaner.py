@@ -1,5 +1,6 @@
 import click
 import lzma
+import MeCab
 import numpy as np
 import fasttext
 import re
@@ -7,19 +8,20 @@ import sys
 
 from tqdm import tqdm
 
+from mosestokenizer import MosesTokenizer
 from external_processor import ExternalTextProcessor
 
 re_ascii_text = re.compile(r"['!\"#$%&()*+,-./:;<=>?@\[\\\]^_`{|}~\t\s0-9]+")
 re_ascii_char = re.compile(r"['!\"#$%&()*+,-./:;<=>?@\[\\\]^_`{|}~0-9]")
 
 
-def is_ascii_artistic(sent, tok, std_threshould=6.0):
+def is_ascii_artistic(sent, tokenize, std_threshould=6.0):
     if re.fullmatch(re_ascii_text, sent):
         return True, 1.0
     else:
-        tokens = tok.process(sent).strip().split()
+        tokens = tokenize(sent)
         more_tokens = []
-        if "mecab" in tok.cmd[0]:
+        if hasattr(tokenize, "__name__") and tokenize.__name__ == "mecab":
             for token in tokens:
                 if re_ascii_text.fullmatch(token):
                     more_tokens.extend(["-" for c in token])
@@ -47,8 +49,8 @@ def is_ascii_artistic(sent, tok, std_threshould=6.0):
 @click.option("--lid_model", help="fastText LID model path")
 @click.option("--lang1", required=True, help="")
 @click.option("--lang2", required=True, help="")
-@click.option("--tokenizer1", "-t1", required=True, help="")
-@click.option("--tokenizer2", "-t2", required=True, help="")
+@click.option("--tokenizer1", "-t1", default="moses", help="")
+@click.option("--tokenizer2", "-t2", default="moses", help="")
 @click.option("--err_out")
 def main(inp, lid, lid_model, lang1, lang2, tokenizer1, tokenizer2, err_out):
     try:
@@ -70,8 +72,6 @@ def main(inp, lid, lid_model, lang1, lang2, tokenizer1, tokenizer2, err_out):
         else:
             raise ValueError("LID out of bounds")
 
-        tok1 = ExternalTextProcessor(tokenizer1.split())
-        tok2 = ExternalTextProcessor(tokenizer2.split())
         for line in tqdm(reader):
             if isinstance(line, bytes):
                 line = line.decode("utf8")
@@ -81,6 +81,9 @@ def main(inp, lid, lid_model, lang1, lang2, tokenizer1, tokenizer2, err_out):
             if s1.strip() == s2.strip():
                 print(f"eq: {line}", file=err)
                 continue
+
+            tok1 = get_tokenizer(tokenizer1, lang1)
+            tok2 = get_tokenizer(tokenizer2, lang2)
 
             ascii1, std1 = is_ascii_artistic(s1, tok1)
             ascii2, std2 = is_ascii_artistic(s2, tok2)
@@ -100,6 +103,23 @@ def main(inp, lid, lid_model, lang1, lang2, tokenizer1, tokenizer2, err_out):
             reader.close()
         if err_out and err:
             err.close()
+
+
+def get_tokenizer(cmd, lang="en"):
+    if cmd == "moses":
+        return MosesTokenizer(lang)
+    elif cmd == "mecab":
+        tagger = MeCab.Tagger("-Owakati")
+
+        def mecab(text):
+            return tagger.parse(text).strip().split()
+        return mecab
+    else:
+        proc = ExternalTextProcessor(cmd.split())
+
+        def external(text):
+            return proc.process(text).strip().split()
+        return external
 
 
 if __name__ == "__main__":
