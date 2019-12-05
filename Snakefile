@@ -193,16 +193,16 @@ if "bifixerOptions" in config:
 else:
     BIFIXEROPTIONS = "--aggressive_dedup"
 
-if "miniclean" in config and config["miniclean"]:
-    MINIC_LID = config["minicleanLID"].strip()
-    if ":" in MINIC_LID:
-        MINIC_LID, MINIC_LID_MODEL = MINIC_LID.split(":")
-        MINIC_LID, MINIC_LID_MODEL = MINIC_LID.strip(), MINIC_LID_MODEL.strip()
+if "lidetc" in config and config["lidetc"]:
+    LIDETC_LID = config["lidetcLID"].strip()
+    if ":" in LIDETC_LID:
+        LIDETC_LID, LIDETC_LID_MODEL = LIDETC_LID.split(":")
+        LIDETC_LID, LIDETC_LID_MODEL = LIDETC_LID.strip(), LIDETC_LID_MODEL.strip()
     else:
-        MINIC_LID_MODEL = ""
-    MINIC_SUFFIX = ".mc"
+        LIDETC_LID_MODEL = ""
+    LIDETC_SUFFIX = ".lid"
 else:
-    MINIC_SUFFIX = ""
+    LIDETC_SUFFIX = ""
 
 FILTER = config.get("filter", "").upper()
 
@@ -636,20 +636,19 @@ rule zipporah_filter:
 
 # ================================== Finish  ================================== #
 
-rule miniclener:
+rule lidetc:
     input:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.xz'
     output:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc.xz'
-#        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.lid.xz'
     params:
-        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.mc-err.xz'
+        f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.lid-err.xz'
     shell:
-        'xzcat -T 0 -f {input} | python3 ./scripts/minicleaner.py --lid {MINIC_LID} --lid_model {MINIC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --tokenizer1 moses --tokenizer2 mecab --err_out {params} | xz -T 0 > {output}'
+        'xzcat -T 0 -f {input} | python3 ./scripts/lidetc.py --lid {LIDETC_LID} --lid_model {LIDETC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --tokenizer1 moses --tokenizer2 mecab --err_out {params} | xz -T 0 > {output}'
 
 rule raw:
     input:
-        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}{MINIC_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domain)
+        expand(f"{TRANSIENT_DIR}/{{domain}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}{LIDETC_SUFFIX}.xz", dir=TRANSIENT_DIR, domain=mine_domain)
     output:
         f"{PERMANENT_DIR}/{LANG1}-{LANG2}.raw.xz"
     run:

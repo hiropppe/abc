@@ -26,7 +26,7 @@ sentenceSplitters: {
 lang1: en
 lang2: ja
 
-#hosts: ["ahatoro.com", "yotsutake.co.jp"]
+hosts: ["ahatoro.com", "yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
 #hosts: ["yotsutake.co.jp"]
 #hosts: ["www.asiabiomass.jp"]
@@ -67,7 +67,7 @@ task: [
     #    "align-document",
     #    "align-paragraph",
     #    "align-sentence",
-    "filtering",
+    #    "filtering",
     "finish",
 ]
 
@@ -95,7 +95,7 @@ sentenceAligner: HUNALIGN
 #sentenceAligner: LASER
 
 #filter: BICLEANER
-filter: ZIPPORAH
+#filter: ZIPPORAH
 
 strandThreshold: 0.1
 strandDpThreshold: 0.3
@@ -128,8 +128,8 @@ bifixer: false
 
 elrc: false
 
-miniclean: false
-minicleanLID: "fastText: /root/fastText/model/lid.176.bin"
+lidetc: true
+lidetcLID: "fastText: /root/fastText/model/lid.176.bin"
 
 tmx: true
 
