@@ -40,7 +40,8 @@ def train(data, label, model):
 def predict(data, model, output):
     X = np.loadtxt(data)
     logreg = pickle.load(open(model, 'rb'))
-    pred = logreg.decision_function(X)
+    # pred = logreg.decision_function(X)
+    pred = logreg.predict_proba(X)[:, 1]
     np.savetxt(output, pred, "%s")
 
 
