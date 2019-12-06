@@ -163,9 +163,16 @@ for line in reader:
     for field, column in zip(fields, columns):
         fieldsdict[column] = field
 
+    invalid_line = False
     if options.dedup:
         for part in options.dedup.split(','):
+            if part not in fieldsdict:
+                print(f"invalid line: \"{line[:-1]}\" at {idcounter:d}", file=sys.stderr)
+                invalid_line = True
+                break
             line_hash = line_hash + "\t" + fieldsdict[part]
+    if invalid_line:
+        continue
     if 'seg1' not in fieldsdict:
         fieldsdict['seg1'] = ""
     if 'seg2' not in fieldsdict:
