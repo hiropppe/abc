@@ -43,6 +43,11 @@ def get_domain_hosts(wildcards):
     return output
 
 
+try:
+    GPUs = int(subprocess.check_output("nvidia-smi | grep Default | wc -l", shell=True).split()[0])
+except: # noqa
+    GPUs = 0
+
 LANG1 = config["lang1"]
 LANG2 = config["lang2"]
 
@@ -412,13 +417,42 @@ rule laser_mine:
     output:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.lsr.ind.xz'
     shell:
-        '{PROFILING} ./scripts/laser_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
+        'gpid_dir=/tmp;'
+
+        'if [ {GPUs} -eq 0 ]; then'
+        '    if [ ! -s /tmp/gpus ]; then'
+        '        nvidia-smi -L | awk \'{{print$2}}\' | cut -c1 > /tmp/gpus'
+        '    fi;'
+
+        '    while true'
+        '    do'
+        '        while read gpu;'
+        '        do'
+        '            if [ -f ${{gpid_dir}}/gpu${{gpu}}.lock ]; then'
+        '                continue;'
+        '            fi;'
+        '            use_rate=$(nvidia-smi -i $gpu | grep Default | awk \'{{print$13}}\')'
+        '            if [ $use_rate = "0%" ]; then'
+        '                echo "using GPU${{gpu}}" '
+        '                touch ${{gpid_dir}}/gpu${{gpu}}.lock;'
+        '                break 2;'
+        '            fi;'
+        '        done < /tmp/gpus;'
+        '        sleep 3;'
+        '    done;'
+        'fi;'
+
+        '{PROFILING} CUDA_VISIBLE_DEVICES=$gpu ./scripts/laser_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
         '  --encoder {LASER_ENCODER} --bpe_codes {LASER_BPE_CODES} {LASER_ENC_PROC}'
         '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_PROC} --output {output};'
 
         'if [ ! -s {output} ]; then'
         '    touch {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}.lsr.ind;'
         '    xz {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}.lsr.ind;'
+        'fi;'
+
+        'if [ -f ${gpid_dir}/gpu${gpu}.lock ]; then'
+        '   rm -f ${gpid_dir}/gpu${gpu}.lock;'
         'fi;'
 
 # ================================== SEGMENT ALIGNMENT (STRAND + HUNALIGN) ================================== #
