@@ -414,7 +414,12 @@ rule laser_mine:
     shell:
         '{PROFILING} ./scripts/laser_mine.py --src {input.src} --tgt {input.tgt} --offset {input.offset} --slang {LANG1} --tlang {LANG2}'
         '  --encoder {LASER_ENCODER} --bpe_codes {LASER_BPE_CODES} {LASER_ENC_PROC}'
-        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_PROC} --output {output}'
+        '  --unify --mode mine --retrieval max --margin ratio -k 4 --verbose {LASER_KNN_PROC} --output {output};'
+
+        'if [ ! -s {output} ]; then'
+        '    touch {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}.lsr.ind;'
+        '    xz {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}.lsr.ind;'
+        'fi;'
 
 # ================================== SEGMENT ALIGNMENT (STRAND + HUNALIGN) ================================== #
 

@@ -15,7 +15,7 @@ def write_sentences(b64_text, sent_tokenizer, outfile):
     tokenized_segs = proc_sent.process(content).strip()
     n_sents = 0
     for sent in tokenized_segs.split("\n"):
-        if sum([1 for m in sent if m in string.punctuation + string.digits]) < len(sent) // 2:
+        if len(sent) < 1000 and sum([1 for m in sent if m in string.punctuation + string.digits]) < len(sent) // 2:
             print(sent, file=outfile)
             n_sents += 1
     return n_sents

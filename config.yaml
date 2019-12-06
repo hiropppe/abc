@@ -18,9 +18,9 @@ wordTokenizers: {
 }
 
 sentenceSplitters: {
-    default: /root/abc/scripts/pragmatic_segmenter.rb en,
-    en: /root/abc/scripts/pragmatic_segmenter.rb en,
-    ja: /root/abc/scripts/pragmatic_segmenter.rb ja,
+    default: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l en,
+    en: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l en,
+    ja: /root/mosesdecoder/scripts/ems/support/split-sentences.perl -q -b -l ja,
 }
 
 lang1: en
@@ -61,6 +61,12 @@ lang2: ja
 #hosts: ["www.bewith.jp"]
 #hosts: ["www.hataoka.jp"]
 
+# 0 alignment
+#hosts: ["viqua.info"]
+
+# 1 alignment
+#hosts: ["www.yhachina.com"]
+#hosts: ["www.asus.com"]
 #hosts: ["www.iwc.com"]
 
 task: [
@@ -68,8 +74,8 @@ task: [
     #    "preprocessing",
     #    "align-document",
     #    "align-paragraph",
-    #    "align-sentence",
-    "filtering",
+    "align-sentence",
+    #    "filtering",
     "finish",
 ]
 
@@ -91,13 +97,13 @@ langId: cld2
 
 documentAligner: URL
 
-paragraphAligner: STRAND
+#paragraphAligner: STRAND
 
-sentenceAligner: HUNALIGN
-#sentenceAligner: LASER
+#sentenceAligner: HUNALIGN
+sentenceAligner: LASER
 
 #filter: BICLEANER
-filter: ZIPPORAH
+#filter: ZIPPORAH
 
 strandThreshold: 0.1
 strandDpThreshold: 0.3
