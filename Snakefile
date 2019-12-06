@@ -565,24 +565,29 @@ rule zipporah_trans_score:
         trans1 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG1}-{LANG2}",
         trans2 = f"{TRANSIENT_DIR}/{{target}}/translation.{LANG2}-{LANG1}",
     shell:
-        'tmpfolder={TRANSIENT_DIR}/{wildcards.target}/translation/;'
-        'mkdir -p $tmpfolder;'
-        'rm -rf $tmpfolder;'
-        'mkdir -p $tmpfolder;'
+        'if [ $(xzcat {input.data} | wc -l) -eq 0 ]; then '
+        '    touch {output.trans1}; '
+        '    touch {output.trans2}; '
+        'else'
+        '    tmpfolder={TRANSIENT_DIR}/{wildcards.target}/translation/;'
+        '    mkdir -p $tmpfolder;'
+        '    rm -rf $tmpfolder;'
+        '    mkdir -p $tmpfolder;'
 
-        'xzcat -T 0 -f {input.data} | awk -F \'\t\' \'BEGIN{{OFS="\t"}} {{print ($3, $4)}}\' > $tmpfolder/pasted;'
+        '    xzcat -T 0 -f {input.data} | awk -F \'\t\' \'BEGIN{{OFS="\t"}} {{print ($3, $4)}}\' > $tmpfolder/pasted;'
 
-        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $1}}\' | {WORDTOK1} > $tmpfolder/s.in;'
-        'cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $2}}\' | {WORDTOK2} > $tmpfolder/s.out;'
+        '    cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $1}}\' | {WORDTOK1} > $tmpfolder/s.in;'
+        '    cat $tmpfolder/pasted | awk -F \'\t\' \'{{print $2}}\' | {WORDTOK2} > $tmpfolder/s.out;'
 
-        '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.in $tmpfolder/s.out {ZIPO_DIC1} $tmpfolder/out.f2e;'
-        '{ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.out $tmpfolder/s.in {ZIPO_DIC2} $tmpfolder/out.e2f;'
+        '    {ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.in $tmpfolder/s.out {ZIPO_DIC1} $tmpfolder/out.f2e;'
+        '    {ZIPPORAH}/scripts/generate-translation-scores.sh {ZIPO_CONFIG} $tmpfolder/s.out $tmpfolder/s.in {ZIPO_DIC2} $tmpfolder/out.e2f;'
 
-        'touch {output.trans1} {output.trans2};'
-        'rm {output.trans1} {output.trans2};'
+        '    touch {output.trans1} {output.trans2};'
+        '    rm {output.trans1} {output.trans2};'
 
-        'cat $tmpfolder/out.f2e >> {output.trans1};'
-        'cat $tmpfolder/out.e2f >> {output.trans2};'
+        '    cat $tmpfolder/out.f2e >> {output.trans1};'
+        '    cat $tmpfolder/out.e2f >> {output.trans2};'
+        'fi;'
 
 rule zipporah_lm_score:
     input:
@@ -595,12 +600,15 @@ rule zipporah_lm_score:
     output:
         ngram = f"{TRANSIENT_DIR}/{{target}}/ngram.{{lang, [a-z][a-z]}}",
     shell:
-        'map_unk=`tail -n 1 {params.vocab}`;'
-
-        'xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk -v v={params.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {params.lm} | grep ^Total | awk \'{{print -$2}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang};'
+        'if [ $(xzcat {input.data} | wc -l) -eq 0 ]; then '
+        '    touch {output.ngram}; '
+        'else'
+        '    map_unk=`tail -n 1 {params.vocab}`;'
+        '    xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk -v v={params.vocab} -v u=$map_unk \'BEGIN{{while((getline<v)>0) m[$1]=1;}}{{for(i=1;i<=NF;i++) {{w=$i; if(m[w] !=1) w=u; printf("%s ", w)}}; print""}}\' | {MOSES}/bin/query -v sentence {params.lm} | grep ^Total | awk \'{{print -$2}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang};'
         # +1 because of the EOS symbol
-        'xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk \'{{print NF + 1}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang};'
-        'paste {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang} {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang} | awk \'{{print $1 / $2}}\' > {output.ngram};'
+        '    xzcat -T 0 -f {input.data} | cut -f{params.col} | {params.tok} | awk \'{{print NF + 1}}\' > {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang};'
+        '    paste {TRANSIENT_DIR}/{wildcards.target}/ngram.total.{wildcards.lang} {TRANSIENT_DIR}/{wildcards.target}/ngram.length.{wildcards.lang} | awk \'{{print $1 / $2}}\' > {output.ngram};'
+        'fi;'
 
 rule zipporah_feats:
     input:
@@ -623,8 +631,19 @@ rule zipporah:
         y = f"{TRANSIENT_DIR}/{{target}}/zipporah.score",
         zipp = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score.xz'
     shell:
-        'python ./scripts/zipporah.py predict {input.X} {ZIPO_MODEL} {output.y};'
-        'paste <(xzcat -T 0 {input.bitext}) {output.y} | xz -T 0 > {output.zipp};'
+        'if [ ! -s {input.X} ]; then'
+        '    touch {output.y};'
+        '    touch {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score;'
+        '    xz {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score;'
+        'elif [ ! $(xzcat {input.bitext} | wc -l) -eq $(cat {input.X} | wc -l) ]; then'
+        '    echo "input size mismatch!";'
+        '    touch {output.y};'
+        '    touch {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score;'
+        '    xz {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}.zip.score;'
+        'else'
+        '    python ./scripts/zipporah.py predict {input.X} {ZIPO_MODEL} {output.y};'
+        '    paste <(xzcat -T 0 {input.bitext}) {output.y} | xz -T 0 > {output.zipp};'
+        'fi;'
 
 rule zipporah_filter:
     input:

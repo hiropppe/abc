@@ -39,6 +39,8 @@ def train(data, label, model):
 @click.argument("output")
 def predict(data, model, output):
     X = np.loadtxt(data)
+    if X.ndim == 1:
+        X = X.reshape((1, 2))
     logreg = pickle.load(open(model, 'rb'))
     # pred = logreg.decision_function(X)
     pred = logreg.predict_proba(X)[:, 1]

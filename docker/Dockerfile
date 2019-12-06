@@ -22,6 +22,7 @@ RUN apt-get update && \
         openjdk-8-jdk pdftohtml \
         zlib1g-dev libbz2-dev \
         ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion \
+        gawk \
         language-pack-ja-base && \
     apt-get clean
 

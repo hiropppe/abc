@@ -14,7 +14,7 @@ hunalign: /root/hunalign
 wordTokenizers: {
     default: /root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en,
     en: /root/mosesdecoder/scripts/tokenizer/tokenizer.perl -q -b -a -l en,
-    ja: mecab -Owakati 
+    ja: mecab -Owakati -b 81920 
 }
 
 sentenceSplitters: {
@@ -26,7 +26,7 @@ sentenceSplitters: {
 lang1: en
 lang2: ja
 
-hosts: ["ahatoro.com", "yotsutake.co.jp"]
+#hosts: ["ahatoro.com", "yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
 #hosts: ["yotsutake.co.jp"]
 #hosts: ["www.asiabiomass.jp"]
@@ -61,13 +61,15 @@ hosts: ["ahatoro.com", "yotsutake.co.jp"]
 #hosts: ["www.bewith.jp"]
 #hosts: ["www.hataoka.jp"]
 
+#hosts: ["www.iwc.com"]
+
 task: [
     #    "concat",
     #    "preprocessing",
     #    "align-document",
     #    "align-paragraph",
     #    "align-sentence",
-    #    "filtering",
+    "filtering",
     "finish",
 ]
 
@@ -95,7 +97,7 @@ sentenceAligner: HUNALIGN
 #sentenceAligner: LASER
 
 #filter: BICLEANER
-#filter: ZIPPORAH
+filter: ZIPPORAH
 
 strandThreshold: 0.1
 strandDpThreshold: 0.3
@@ -128,7 +130,7 @@ bifixer: false
 
 elrc: false
 
-lidetc: true
+lidetc: false
 lidetcLID: "fastText: /root/fastText/model/lid.176.bin"
 
 tmx: true
