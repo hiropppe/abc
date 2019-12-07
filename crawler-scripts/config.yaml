@@ -1,0 +1,13 @@
+temp: /tmp
+
+dataDir: /data/bitextor/data
+
+crawlTimeLimit: "86400"
+
+heritrixPath: /data/bitextor/data/heritrix
+heritrixUrl: https://localhost:8443
+heritrixUser: admin:admin
+heritrixContactUs: https://paracrawl.eu/ 
+heritrixBeans: ./crawler-beans.cxml
+
+seeds: ["http://ahatoro.com/"]
