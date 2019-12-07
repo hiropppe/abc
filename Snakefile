@@ -453,9 +453,9 @@ rule laser_mine:
         '    xz {TRANSIENT_DIR}/{wildcards.target}/bitext{DALIGN_SUFFIX}.lsr.ind;'
         'fi;'
 
-#        'if [ -f ${{gpid_dir}}/gpu${{gpu}}.lock ]; then'
-#        '    rm -f ${{gpid_dir}}/gpu${{gpu}}.lock;'
-#        'fi;'
+        'if [ -f ${{gpid_dir}}/gpu${{gpu}}.lock ]; then'
+        '    rm -f ${{gpid_dir}}/gpu${{gpu}}.lock;'
+        'fi;'
 
 # ================================== SEGMENT ALIGNMENT (STRAND + HUNALIGN) ================================== #
 
