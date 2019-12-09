@@ -43,9 +43,12 @@ def get_domain_hosts(wildcards):
     return output
 
 
-try:
-    GPUs = int(subprocess.check_output("nvidia-smi | grep Default | wc -l", shell=True).split()[0])
-except: # noqa
+if config.get("laser_knn_gpu", False) and config.get("laser_enc_gpu", False):
+    try:
+        GPUs = int(subprocess.check_output("nvidia-smi | grep Default | wc -l", shell=True).split()[0])
+    except: # noqa
+        GPUs = 0
+else:
     GPUs = 0
 
 LANG1 = config["lang1"]
