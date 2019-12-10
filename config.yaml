@@ -114,7 +114,7 @@ hunalignThreshold: 0.0
 laser_model_dir: /root/LASER/models
 laser_encoder: /root/LASER/models/bilstm.93langs.2018-12-26.pt
 laser_bpe_codes: /root/LASER/models/93langs.fcodes
-laser_threshold: 1.1
+laser_threshold: 0.9
 laser_enc_gpu: false
 laser_knn_gpu: false
 
@@ -130,14 +130,14 @@ zipporahVocab1: "/data/bitextor/model/zipporah/en-ja/vocab.en"
 zipporahVocab2: "/data/bitextor/model/zipporah/en-ja/vocab.ja"
 zipporahLM1: "/data/bitextor/model/zipporah/en-ja/lm.en"
 zipporahLM2: "/data/bitextor/model/zipporah/en-ja/lm.ja"
-zipporahThreshold: 0.5
+zipporahThreshold: 0.01
 
 bifixer: false
 
 elrc: false
 
 lidetc: false
-lidetcLID: "fastText: /root/fastText/model/lid.176.bin"
+LID: "fastText: /root/fastText/model/lid.176.bin"
 
 tmx: true
 

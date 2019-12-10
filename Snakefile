@@ -124,7 +124,7 @@ else:
 
 if config.get("deduped", True):
     DEDUP = '--dedup "seg1,seg2"'
-    FILTER_SORT = f"LC_ALL=C sort -t$'\t' -k3,4 -T {TMP_DIR} --compress-program=gzip |"
+    FILTER_SORT = f"LC_ALL=C sort -t$'\\t' -k3,4 -T {TMP_DIR} --compress-program=gzip |"
 else:
     DEDUP = ""
     FILTER_SORT = ""
@@ -202,15 +202,16 @@ else:
     BIFIXEROPTIONS = "--aggressive_dedup"
 
 if "lidetc" in config and config["lidetc"]:
-    LIDETC_LID = config["lidetcLID"].strip()
-    if ":" in LIDETC_LID:
-        LIDETC_LID, LIDETC_LID_MODEL = LIDETC_LID.split(":")
-        LIDETC_LID, LIDETC_LID_MODEL = LIDETC_LID.strip(), LIDETC_LID_MODEL.strip()
-    else:
-        LIDETC_LID_MODEL = ""
     LIDETC_SUFFIX = ".lid"
 else:
     LIDETC_SUFFIX = ""
+
+LID = config["LID"].strip()
+if ":" in LID:
+    LID, LID_MODEL = LID.split(":")
+    LID, LID_MODEL = LID.strip(), LID_MODEL.strip()
+else:
+    LID_MODEL = ""
 
 FILTER = config.get("filter", "").upper()
 
@@ -402,7 +403,9 @@ rule align_doc_by_url:
 
 rule prepare_laser_mine:
     input:
-        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz"
+        f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.xz",
+        f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/deboilerplate_html.xz",
+        f"{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/deboilerplate_html.xz",
     output:
         f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG1}",
         f"{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}.cc.{LANG2}",
@@ -410,7 +413,20 @@ rule prepare_laser_mine:
     params:
         prefix = f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}'
     shell:
-        '{PROFILING} xzcat -T 0 {input} | ./scripts/prepare_laser_mine.py -p {params.prefix} -sl {LANG1} -tl {LANG2} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}"'
+        'html_gz=$(mktemp "{TMP_DIR}/laser_prepare.html.XXXXXX.gz");'
+
+        'while IFS= read -r line;'
+        'do '
+        '  n1=$(echo "$line" | cut -f1);'
+        '  n2=$(echo "$line" | cut -f2);'
+        '  t1=$(xzcat -T 0 {input[1]} | sed -n "${{n1}}p");'
+        '  t2=$(xzcat -T 0 {input[2]} | sed -n "${{n2}}p");'
+        '  echo -e "$n1\t$n2\t$t1\t$t2";'
+        'done < <(xzcat -T 0 {input[0]}) | gzip -c > $html_gz;'
+
+        '{PROFILING} zcat $html_gz | ./scripts/prepare_laser_mine.py -p {params.prefix} -sl {LANG1} -tl {LANG2} -s1 "{SENTTOK1}" -s2 "{SENTTOK2}" --lid {LID} --lid_model {LID_MODEL};'
+
+        'rm $html_gz;'
 
 rule laser_mine:
     input:
@@ -475,6 +491,7 @@ rule strand_align:
     shell:
         'html_gz=$(mktemp "{TMP_DIR}/html.docalign.XXXXXX.gz");'
         'strand_out=$(mktemp "{TMP_DIR}/strand.align.XXXXXX");'
+
         'while IFS= read -r line;'
         'do '
         '  n1=$(echo "$line" | cut -f1);'
@@ -485,7 +502,9 @@ rule strand_align:
         '  t2=$(xzcat -T 0 {input[4]} | sed -n "${{n2}}p");'
         '  echo -e "k\t{LANG1}\t$url1\t$t1\t{LANG2}\t$url2\t$t2";'
         'done < <(xzcat -T 0 {input[0]}) | gzip -c > $html_gz;'
+
         '{PROFILING} strand-align -i $html_gz -o $strand_out -ib64 -ah;'
+
         'if [ -f ${{strand_out}}.{LANG2}-{LANG1}.ann ]; then'
         '  cat ${{strand_out}}.{LANG2}-{LANG1}.ann | awk -F$\'\t\' \'{{print $2"\\t"$1"\\t"$3"\\t"$4"\\t"$5"\\t"$7"\\t"$6}}\' > {output[0]};'
         '  cat ${{strand_out}}.{LANG2}-{LANG1} | awk -F$\'\t\' \'{{print $3"\\t"$4"\\t"$1"\\t"$2"\\t"$5}}\' > {output[1]};'
@@ -493,6 +512,7 @@ rule strand_align:
         '  touch {output[0]};'
         '  touch {output[1]};'
         'fi;'
+
         'rm $html_gz;'
         'rm $strand_out;'
 
@@ -707,7 +727,7 @@ rule lidetc:
     params:
         f'{TRANSIENT_DIR}/{{target}}/bitext{DALIGN_SUFFIX}{PALIGN_SUFFIX}{SALIGN_SUFFIX}{FILTER_SUFFIX}.lid-err.xz'
     shell:
-        'xzcat -T 0 -f {input} | python3 ./scripts/lidetc.py --lid {LIDETC_LID} --lid_model {LIDETC_LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --tokenizer1 moses --tokenizer2 mecab --err_out {params} | xz -T 0 > {output}'
+        'xzcat -T 0 -f {input} | python3 ./scripts/lidetc.py --lid {LID} --lid_model {LID_MODEL} --lang1 {LANG1} --lang2 {LANG2} --tokenizer1 moses --tokenizer2 mecab --err_out {params} | xz -T 0 > {output}'
 
 rule raw:
     input:
