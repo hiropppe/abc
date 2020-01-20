@@ -47,7 +47,8 @@ def create_seed_dict(seeds):
 
 # ================================== TARGET HOSTS ================================ #
 warc_path = DATA_DIR / "warc"
-crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
+#crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
+crawled_hosts = set()
 print(f"read hosts from warc dir={len(crawled_hosts):d}")
 
 seeds = None
@@ -110,8 +111,8 @@ rule heritrix:
         'DIRNAME=$(mktemp -d "{TMP_DIR}/downloaded.{wildcards.target}.XXXXXX"); '
         'echo $DIRNAME;'
 
-        'echo "cat ./bitextor/crawler-beans.cxml | sed \\"s@http://contact.us/@{HERITRIXCONTACTUS}@g\\" | sed \\"s@http://seed.com/@{params.seeds}@g\\" | sed \\"s@http://(com,surt,@{params.surt}@g\\" > $DIRNAME/my-crawler-beans.cxml"; '
-        'cat ./bitextor/crawler-beans.cxml | sed "s@http://contact.us/@{HERITRIXCONTACTUS}@g" | sed "s@http://seed.com/@{params.seeds}@g" | sed "s@http://(com,surt,@{params.surt}@g" > $DIRNAME/my-crawler-beans.cxml; '
+        'echo "cat ./crawler-beans.cxml | sed \\"s@http://contact.us/@{HERITRIXCONTACTUS}@g\\" | sed \\"s@http://seed.com/@{params.seeds}@g\\" | sed \\"s@http://(com,surt,@{params.surt}@g\\" > $DIRNAME/my-crawler-beans.cxml"; '
+        'cat ./crawler-beans.cxml | sed "s@http://contact.us/@{HERITRIXCONTACTUS}@g" | sed "s@http://seed.com/@{params.seeds}@g" | sed "s@http://(com,surt,@{params.surt}@g" > $DIRNAME/my-crawler-beans.cxml; '
 
         'echo "curl -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml"; '
         'curl --silent --output /dev/null --show-error --fail -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml; '
