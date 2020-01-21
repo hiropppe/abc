@@ -48,7 +48,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /root
 
-RUN wget http://builds.archive.org/maven2/org/archive/heritrix/heritrix/3.4.0-SNAPSHOT/heritrix-3.4.0-20190828.200101-25-dist.tar.gz
+RUN wget http://builds.archive.org/maven2/org/archive/heritrix/heritrix/3.4.0-SNAPSHOT/heritrix-3.4.0-20190828.200101-25-dist.tar.gz \
  && tar xzf heritrix-3.4.0-20190828.200101-25-dist.tar.gz \
  && cd heritrix-3.4.0-SNAPSHOT
 
