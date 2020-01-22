@@ -1,4 +1,10 @@
-FROM panubo/s3fs
+FROM debian:stretch
+
+ENV S3FS_VERSION=1.84 S3FS_SHA1=9322692aa797fcc6fefe300086e07b33bbc735c9
+
+ADD *.sh /
+
+RUN /build-s3fs.sh
 
 WORKDIR /root
 
@@ -29,3 +35,5 @@ RUN wget http://builds.archive.org/maven2/org/archive/heritrix/heritrix/3.4.0-SN
 ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 ENV HERITRIX_HOME /root/heritrix-3.4.0-SNAPSHOT
 ENV JAVA_OPTS -Xmx10G
+
+ENTRYPOINT ["/entry.sh"]
