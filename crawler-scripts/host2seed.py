@@ -32,9 +32,9 @@ def main(input_path, use_chrome):
     for i, host in enumerate(hosts):
         print("{:d} {:s} >> ".format(i, host), file=sys.stderr, end="")
 
-        seed, method, http_status = resolve(host, use_chrome=use_chrome)
+        seed, method, http_status, bytesize = resolve(host, use_chrome=use_chrome)
         if not seed and use_chrome:
-            seed, method, http_status = resolve(host, use_chrome=False)
+            seed, method, http_status, bytesize = resolve(host, use_chrome=False)
             counter[method] += 1
         else:
             counter[method] += 1
@@ -42,7 +42,7 @@ def main(input_path, use_chrome):
         if seed and re.match("https?://\S+", seed):
             print(seed)
 
-        print("[{:s}] {:s} ({:d})".format(method, seed if seed else "Discarded", http_status), file=sys.stderr)
+        print("[{:s}] {:s} {:d} ({:d})".format(method, seed if seed else "Discarded", bytesize, http_status), file=sys.stderr)
 
     print("input={:d}, canonical={:d}, www={:d}, discard={:d}".format(
         counter["i"], counter["c"], counter["w"], counter["d"]), file=sys.stderr)
@@ -57,6 +57,7 @@ def resolve(host, use_chrome=True):
 
     try:
         status_code = -1
+        html = b''
         try:
             if use_chrome:
                 test_url, html, status_code = chrome.get(url)
@@ -70,14 +71,14 @@ def resolve(host, use_chrome=True):
                     if canonical_url:
                         canonical_url = canonical_url[0]
                         test_url = canonical_url.get("href")
-                        test_url, _, status_code = requests_get(test_url)
+                        test_url, html, status_code = requests_get(test_url)
                         if status_code == 200:
-                            return test_url, "c", status_code
+                            return test_url, "c", status_code, len(html)
                 except:  # noqa
                     pass
 
             if status_code == 200:
-                return test_url, "i", status_code
+                return test_url, "i", status_code, len(html)
         except:  # noqa
             pass
 
@@ -86,16 +87,16 @@ def resolve(host, use_chrome=True):
             test_url = "http://" + ".".join(["www", ret.domain, ret.suffix])
             try:
                 if use_chrome:
-                    test_url, _, status_code = chrome.get(test_url)
+                    test_url, html, status_code = chrome.get(test_url)
                 else:
-                    test_url, _, status_code = requests_get(test_url)
+                    test_url, html, status_code = requests_get(test_url)
 
                 if status_code == 200:
-                    return test_url, "w", status_code
+                    return test_url, "w", status_code, len(html)
             except:  # noqa
                 pass
 
-        return None, "d", status_code
+        return None, "d", status_code, len(html)
     finally:
         if use_chrome:
             chrome.quit()
@@ -133,8 +134,8 @@ class Chrome:
     def get(self, url):
         self.driver.get(url)
         # Check current_url is accesible by requests
-        _, _, status_code = requests_get(self.driver.current_url)
-        return self.driver.current_url, self.driver.page_source, status_code
+        _, content, status_code = requests_get(self.driver.current_url)
+        return self.driver.current_url, content, status_code
 
     def quit(self):
         try:
