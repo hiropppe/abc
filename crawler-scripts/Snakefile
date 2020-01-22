@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import gzip
 import sys
 import tldextract
 
@@ -47,8 +48,8 @@ def create_seed_dict(seeds):
 
 # ================================== TARGET HOSTS ================================ #
 warc_path = DATA_DIR / "warc"
-#crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
-crawled_hosts = set()
+crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
+#crawled_hosts = set()
 print(f"read hosts from warc dir={len(crawled_hosts):d}")
 
 seeds = None
@@ -73,9 +74,9 @@ hosts = sorted(hosts_to_crawl, key=lambda h: tldextract.extract(h).domain)
 
 domain2hosts = create_domain2hosts(hosts)
 
-print("hosts", hosts)
-print("domain2hosts", domain2hosts)
-print("seed_dict", seed_dict)
+#print("hosts", hosts)
+#print("domain2hosts", domain2hosts)
+#print("seed_dict", seed_dict)
 
 # every shell command will run sync
 shell.prefix("sync; set -euo pipefail; ")
