@@ -4,7 +4,8 @@ WORKDIR /root
 
 RUN apt-get update \
  && apt-get install -y \
-        curl wget vim git build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev \
+        curl wget vim git procps tree \
+        build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev \
         openjdk-8-jdk 
 
 RUN curl -O https://www.python.org/ftp/python/3.7.6/Python-3.7.6.tar.xz \
