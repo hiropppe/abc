@@ -7,14 +7,18 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && \
     apt-get install -y \
-        git vim wget bzip2 unzip less tree \
+        git vim wget curl bzip2 unzip less tree \
         openjdk-8-jdk \
         python3 python3-dev python3-pip \
         tzdata language-pack-ja-base && \
     apt-get clean
 
 RUN pip3 install -U pip
-RUN pip --no-cache-dir install jedi flake8 autopep8
+RUN pip --no-cache-dir install \
+        ipykernel \
+        snakemake \
+        tldextract \
+        jedi flake8 autopep8
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
