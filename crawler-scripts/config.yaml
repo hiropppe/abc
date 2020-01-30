@@ -1,13 +1,13 @@
 temp: /tmp
 
-dataDir: /data/bitextor/data
+dataDir: /data
 
 crawlTimeLimit: "86400"
 
-heritrixPath: /data/bitextor/data/heritrix
+heritrixPath: /data/heritrix
 heritrixUrl: https://localhost:8443
 heritrixUser: admin:admin
 heritrixContactUs: https://paracrawl.eu/ 
 heritrixBeans: ./crawler-beans.cxml
 
-seeds: ["http://ahatoro.com/"]
+seeds: ["http://ahatoro.com/", "http://okinawa2go.jp/", "http://en.okinawa2go.jp/"]
