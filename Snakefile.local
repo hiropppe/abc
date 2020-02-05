@@ -5,10 +5,10 @@ import tldextract
 from pathlib import Path
 from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
 
-os.environ['AWS_ACCESS_KEY_ID'] = ''
-os.environ['AWS_SECRET_ACCESS_KEY'] = ''
-os.environ['AWS_DEFAULT_REGION'] = ''
-S3 = S3RemoteProvider()
+#os.environ['AWS_ACCESS_KEY_ID'] = ''
+#os.environ['AWS_SECRET_ACCESS_KEY'] = ''
+#os.environ['AWS_DEFAULT_REGION'] = ''
+#S3 = S3RemoteProvider()
 
 def create_domainkey2hosts(hosts):
     ret = {}
@@ -23,13 +23,18 @@ def create_domainkey2hosts(hosts):
 def get_domain_hosts(wildcards):
     output = []
     for host in domainkey2hosts[wildcards.target]:
-        output.append(S3.remote(f'{DATA_BUCKET}/warc/{host}/{CRAWLER}.warc.gz'))
+        output.append(f'{DATA_BUCKET}/warc/{host}/{CRAWLER}.warc.gz')
+        #output.append(S3.remote(f'{DATA_BUCKET}/warc/{host}/{CRAWLER}.warc.gz'))
     return output
 
 
 TMP_DIR = "/tmp"
 
-DATA_BUCKET = "polyglot-warc-sample"
+PPROCLANGS = ["en", "ja"]
+FILES = ["plain_text.xz", "deboilerplate_html.xz", "normalized_html.xz", "mime.xz", "url.xz"]
+
+DATA_BUCKET = "/polyglot-warc-sample"
+#DATA_BUCKET = "polyglot-warc-sample"
 
 PERMANENT_DIR = "bitext-mining-test/permanent/bitextor-output"
 TRANSIENT_DIR = "bitext-mining-test/transient"
@@ -77,7 +82,8 @@ OUTPUT = []
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
-        OUTPUT.append(S3.remote(f"preprocess/{tld}/concat.warc.gz"))
+        OUTPUT.append(f"{DATA_BUCKET}/preprocess/{tld}/concat.warc.gz")
+        #OUTPUT.append(S3.remote(f"preprocess/{tld}/concat.warc.gz"))
 
 rule all:
     input:
@@ -89,19 +95,21 @@ rule concat_subdomains:
     input:
         get_domain_hosts
     output:
-        S3.remote(f"{DATA_BUCKET}/preprocess/{{target}}/concat.warc.gz")
+        f"{DATA_BUCKET}/preprocess/{{target}}/concat.warc.gz"
+        #S3.remote(f"{DATA_BUCKET}/preprocess/{{target}}/concat.warc.gz")
     shell:
         "cat {input} > {output}"
 
 
 rule warc2preprocess:
     input:
-        S3.remote(f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz")
+        f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz"
+        #S3.remote(f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz")
     output:
         hash = f"{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang/plain_text_hashes.xz",
-        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_DIR, lang=PPROCLANGS, file=FILES)
+        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_BUCKET, lang=PPROCLANGS, file=FILES)
     params:
-        folder = f'{DATA_DIR}/preprocess/{{domain}}/w2p/bitextorlang'
+        folder = f'{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang'
     shell:
         'mkdir -p {params.folder};'
         './scripts/warc2htmlwarc.py {CLEANHTML} {FTFY} --input {input} {USE_PDF_EXTRACT} '
