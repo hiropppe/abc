@@ -1,9 +1,9 @@
 # PARCOMINE CONFIG FILE
 
 temp: /tmp
-permanentDir: /data/bitextor/permanent/bitextor-output
-transientDir: /data/bitextor/transient
-dataDir: /data/bitextor/data
+permanentDir: bitext-mining-test/permanent/bitextor-output
+transientDir: bitext-mining-test/transient
+dataDir: polyglot-warcs-sample
 
 moses: /root/mosesdecoder
 mgiza: /root/mgiza
@@ -26,6 +26,7 @@ sentenceSplitters: {
 lang1: en
 lang2: ja
 
+hosts: ["ahatoro.com", "okinawa2go.jp", "en.okinawa2go.jp"]
 #hosts: ["ahatoro.com", "yotsutake.co.jp"]
 #hosts: ["ahatoro.com"]
 #hosts: ["yotsutake.co.jp"]
@@ -70,13 +71,13 @@ lang2: ja
 #hosts: ["www.iwc.com"]
 
 task: [
-    #    "concat",
+    "concat",
     #    "preprocessing",
     #    "align-document",
     #    "align-paragraph",
-    "align-sentence",
+#    "align-sentence",
     #    "filtering",
-    "finish",
+#    "finish",
 ]
 
 crawler: heritrix
