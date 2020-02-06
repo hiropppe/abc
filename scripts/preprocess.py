@@ -2,14 +2,23 @@
 
 import cchardet
 import click
+import hashlib
 import logging
 import lzma
+import numpy as np
+import os
 import sys
 
 from functools import partial
+from html_parser import get_text_extractor
 from typing import Iterable, Iterator, List, Optional
 from warcio.archiveiterator import ArchiveIterator
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../utils")
+from flat_hash_set import HASH_TYPE, AbstractDedupHashSet, FlatHashSet
+from text_normalizer import normalize_for_dedup
+
+HASH_SIZE = HASH_TYPE(0).nbytes
 
 log = logging.getLogger(__name__).info
 
@@ -17,18 +26,52 @@ log = logging.getLogger(__name__).info
 @click.command()
 @click.option("--input", "-i", help="Input WARC file")
 @click.option("--output", "-o", help="")
+@click.option("--parser", type=click.Choice(["alcazer", "bs4", "modest", "simple"]), default="bs4",
+              help="Use 'HTML tokenizer', 'modest', 'bs4' or 'alcazar' parsers to extract relevant text from HTML. By default 'bs4' is used")
 @click.option("--xzlang", is_flag=True, default=True, help="")
 @click.option("--boilerpipe", is_flag=True, default=False, help="")
 @click.option("--langid", type=click.Choice(["cld2", "cld3", "fastText"]), default="cld2")
 @click.option("--langid_model", default="./model/fastText/lid.176.bin", help="fastText LID model path")
 def main(input,
          output,
+         parser,
          xzlang,
          boilerpipe,
          langid,
          langid_model):
+
+    extract_text = get_text_extractor(parser)
+
+    hashes = FlatHashSet()
+    n_lines = 0
     for doc in WarcReader(input):
-        print(doc["html"])
+        doc_text = extract_text(doc["html"])
+        doc_hashes = compute_hashes(doc_text)
+        if doc_hashes is None:
+            continue
+        hashes.add(doc_hashes)
+        n_lines += doc_hashes.size
+
+    # Free up mem even if the transformer is kept somewhere else.
+    hashes = FlatHashSet()
+
+
+def compute_hashes(content) -> Optional[np.ndarray]:
+    if not content:
+        return None
+    lines = content.split("\n")
+    # save hashes as bytes but reinterpret them as uint64.
+    hashes = np.fromiter(
+        (
+            hashlib.sha1(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[
+                :HASH_SIZE
+            ]
+            for l in lines
+        ),
+        dtype=np.dtype((bytes, HASH_SIZE)),
+        count=len(lines),
+    )
+    return np.ndarray(dtype=HASH_TYPE, buffer=hashes.data, shape=hashes.shape)
 
 
 class WarcReader(Iterable[dict]):
