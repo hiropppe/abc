@@ -38,7 +38,16 @@ PROFILING = "time"
 
 CRAWLER = "heritrix"
 
-TASK_LIST = ["concat",]
+FTFY = "--ftfy"
+CLEANHTML = "--cleanhtml"
+LID = "fastText"
+LID_MODEL = "../fastText/model/lid.176.bin"
+
+FILES = ["url.xz", "html.xz", "text.xz"]
+
+PPROC_LANGS = ["en", "ja"]
+
+TASK_LIST = ["concat"]
 
 # ================================== DETERMINE TARGET HOSTS ================================ #
 # warc_path = DATA_BUCKET + "/warc"
@@ -77,9 +86,12 @@ OUTPUT = []
 
 if "concat" in TASK_LIST:
     for tld in domainkey2hosts.keys():
-        OUTPUT.append(S3.remote(f"preprocess/{tld}/concat.warc.gz"))
+        OUTPUT.append(f"proprocess/{tld}/w2p/bitextorlang/ja/url.xz")
+        OUTPUT.append(f"proprocess/{tld}/w2p/bitextorlang/ja/html.xz")
+        OUTPUT.append(f"proprocess/{tld}/w2p/bitextorlang/ja/text.xz")
+#        OUTPUT.append(S3.remote(f"preprocess/{tld}/concat.warc.gz"))
 
-rule all:
+rule all:  # noqa
     input:
         expand("{target}", target=OUTPUT),
 
@@ -98,19 +110,17 @@ rule warc2preprocess:
     input:
         S3.remote(f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz")
     output:
-        hash = f"{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang/plain_text_hashes.xz",
-        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_DIR, lang=PPROCLANGS, file=FILES)
+        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_BUCKET, lang=PPROC_LANGS, file=FILES)  # noqa
     params:
-        folder = f'{DATA_DIR}/preprocess/{{domain}}/w2p/bitextorlang'
+        folder = f'{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang'
     shell:
         'mkdir -p {params.folder};'
-        './scripts/warc2htmlwarc.py {CLEANHTML} {FTFY} --input {input} {USE_PDF_EXTRACT} '
-        '| ./scripts/warc2preprocess.py --input - {PPROCLANGSOPT} --lang1 {LANG1} --lang2 {LANG2} {BOILERPIPE_CLEANING} --langid {LANGID} --output-dir {params.folder} --output_hash {output.hash} {PLAINTEXTHASHES} {PARSER} {NEOLOGDN}; '
-        'for lang in {PPROCLANGS}; do '
-        '  if [ ! -f {params.folder}/$lang/plain_text.xz ]; then >&2 '
-        '    echo "WARNING: no \'$lang\' data found in {wildcards.domain}. Creating empty files instead";'
+        './scripts/warc2htmlwarc.py {CLEANHTML} {FTFY} --input {input} | ./scripts/preprocess.py --input --output_dir {params.folder} --parser {PARSER} --lid {LID} --lid_model {LID_MODEL}; '  # noqa
+        'for lang in {PPROC_LANGS}; do '
+        '  if [ ! -f {params.folder}/$lang/text.xz ]; then >&2 '
+        '    echo "WARNING: no \'$lang\' data found in {wildcards.domain}. Creating empty files instead";'  # noqa
         '    mkdir -p {params.folder}/$lang;'
-        '    touch {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
-        '    xz -f {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
+        '    touch {params.folder}/$lang/url {params.folder}/$lang/html {params.folder}/$lang/text;'
+        '    xz -f {params.folder}/$lang/url {params.folder}/$lang/html {params.folder}/$lang/text;'
         '  fi ; '
         'done'

@@ -43,6 +43,15 @@ PROFILING = "time"
 
 CRAWLER = "heritrix"
 
+FTFY = "--ftfy"
+CLEANHTML = "--cleanhtml"
+LID = "fastText"
+LID_MODEL = "../fastText/model/lid.176.bin"
+
+FILES = ["url.xz", "html.xz", "text.xz"]
+
+PPROC_LANGS = ["en", "ja"]
+
 TASK_LIST = ["concat",]
 
 # ================================== DETERMINE TARGET HOSTS ================================ #
@@ -106,19 +115,32 @@ rule warc2preprocess:
         f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz"
         #S3.remote(f"{DATA_BUCKET}/preprocess/{{domain}}/concat.warc.gz")
     output:
-        hash = f"{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang/plain_text_hashes.xz",
-        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_BUCKET, lang=PPROCLANGS, file=FILES)
+        files = expand('{data}/preprocess/{{domain}}/w2p/bitextorlang/{lang}/{file}', data=DATA_BUCKET, lang=PPROC_LANGS, file=FILES)  # noqa
     params:
-        folder = f'{DATA_BUCKET}/preprocess/{{domain}}/w2p/bitextorlang'
+        folder = f'{DATA_DIR}/preprocess/{{domain}}/w2p/bitextorlang'
     shell:
         'mkdir -p {params.folder};'
-        './scripts/warc2htmlwarc.py {CLEANHTML} {FTFY} --input {input} {USE_PDF_EXTRACT} '
-        '| ./scripts/warc2preprocess.py --input - {PPROCLANGSOPT} --lang1 {LANG1} --lang2 {LANG2} {BOILERPIPE_CLEANING} --langid {LANGID} --output-dir {params.folder} --output_hash {output.hash} {PLAINTEXTHASHES} {PARSER} {NEOLOGDN}; '
-        'for lang in {PPROCLANGS}; do '
-        '  if [ ! -f {params.folder}/$lang/plain_text.xz ]; then >&2 '
-        '    echo "WARNING: no \'$lang\' data found in {wildcards.domain}. Creating empty files instead";'
+        './scripts/warc2htmlwarc.py {CLEANHTML} {FTFY} --input {input} | ./scripts/preprocess.py --input --output_dir {params.folder} --parser {PARSER} --lid {LID} --lid_model {LID_MODEL}; '  # noqa
+        'for lang in {PPROC_LANGS}; do '
+        '  if [ ! -f {params.folder}/$lang/text.xz ]; then >&2 '
+        '    echo "WARNING: no \'$lang\' data found in {wildcards.domain}. Creating empty files instead";'  # noqa
         '    mkdir -p {params.folder}/$lang;'
-        '    touch {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
-        '    xz -f {params.folder}/$lang/plain_text {params.folder}/$lang/mime {params.folder}/$lang/url {params.folder}/$lang/normalized_html {params.folder}/$lang/deboilerplate_html ;'
+        '    touch {params.folder}/$lang/url {params.folder}/$lang/html {params.folder}/$lang/text;'
+        '    xz -f {params.folder}/$lang/url {params.folder}/$lang/html {params.folder}/$lang/text;'
         '  fi ; '
         'done'
+
+
+# ================================= DOCUMENT ALIGNMENT (SIMPLE URL NORMALIZATION) ================================== #
+
+rule align_doc_by_url:
+    input:
+        f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/plain_text.xz',
+        f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/plain_text.xz',
+        f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG1}/url.xz',
+        f'{DATA_DIR}/preprocess/{{target}}/{PPROC}/bitextorlang/{LANG2}/url.xz',
+    output:
+        f'{TRANSIENT_DIR}/{{target}}/bitext.url.xz'
+    shell:
+        '{PROFILING} ./scripts/align_documents_by_url.py --lang1 {LANG1} --lang2 {LANG2} --text1 {input[0]} --text2 {input[1]} --url1 {input[2]} --url2 {input[3]} | xz -T 0 > {output}'
+

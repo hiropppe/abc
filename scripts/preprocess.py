@@ -33,18 +33,18 @@ log = logging.getLogger(__name__).info
 @click.option("--output", "-o", help="Output Directory")
 @click.option("--parser", type=click.Choice(["alcazer", "bs4", "modest", "simple"]), default="bs4",
               help="Use 'HTML tokenizer', 'modest', 'bs4' or 'alcazar' parsers to extract relevant text from HTML. By default 'bs4' is used")
-@click.option("--langid", type=click.Choice(["cld2", "cld3", "fastText"]), default="cld2")
-@click.option("--langid_model", default="./model/fastText/lid.176.bin", help="fastText LID model path")
+@click.option("--lid", type=click.Choice(["cld2", "cld3", "fastText"]), default="cld2")
+@click.option("--lid_model", default="./model/fastText/lid.176.bin", help="fastText LID model path")
 def main(input,
          output,
          parser,
          xzlang,
          boilerpipe,
-         langid,
-         langid_model):
+         lid,
+         lid_model):
 
     extract_text = get_text_extractor(parser)
-    detect_lang = langdet.get_lang_detector(langid, langid_model)
+    detect_lang = langdet.get_lang_detector(lid, lid_model)
 
     output_dict = defaultdict(dict)
 
