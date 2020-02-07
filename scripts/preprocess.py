@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 
+import base64
 import cchardet
 import click
 import hashlib
+import langdet
 import logging
 import lzma
 import numpy as np
 import os
 import sys
+import traceback
 
+from collections import defaultdict
 from functools import partial
 from html_parser import get_text_extractor
-from typing import Iterable, Iterator, List, Optional
+from pathlib import Path
+from typing import Iterable, Iterator, Optional, Set
 from warcio.archiveiterator import ArchiveIterator
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../utils")
-from flat_hash_set import HASH_TYPE, AbstractDedupHashSet, FlatHashSet
-from text_normalizer import normalize_for_dedup
+from flat_hash_set import HASH_TYPE, AbstractDedupHashSet, FlatHashSet  # noqa
+from text_normalizer import normalize_for_dedup  # noqa
 
 HASH_SIZE = HASH_TYPE(0).nbytes
 
@@ -25,11 +30,9 @@ log = logging.getLogger(__name__).info
 
 @click.command()
 @click.option("--input", "-i", help="Input WARC file")
-@click.option("--output", "-o", help="")
+@click.option("--output", "-o", help="Output Directory")
 @click.option("--parser", type=click.Choice(["alcazer", "bs4", "modest", "simple"]), default="bs4",
               help="Use 'HTML tokenizer', 'modest', 'bs4' or 'alcazar' parsers to extract relevant text from HTML. By default 'bs4' is used")
-@click.option("--xzlang", is_flag=True, default=True, help="")
-@click.option("--boilerpipe", is_flag=True, default=False, help="")
 @click.option("--langid", type=click.Choice(["cld2", "cld3", "fastText"]), default="cld2")
 @click.option("--langid_model", default="./model/fastText/lid.176.bin", help="fastText LID model path")
 def main(input,
@@ -41,19 +44,84 @@ def main(input,
          langid_model):
 
     extract_text = get_text_extractor(parser)
+    detect_lang = langdet.get_lang_detector(langid, langid_model)
 
-    hashes = FlatHashSet()
+    output_dict = defaultdict(dict)
+
+    deduplicates = FlatHashSet()
     n_lines = 0
     for doc in WarcReader(input):
-        doc_text = extract_text(doc["html"])
-        doc_hashes = compute_hashes(doc_text)
-        if doc_hashes is None:
+        text = extract_text(doc["html"])
+        hashes = compute_hashes(text)
+        if hashes is None:
             continue
-        hashes.add(doc_hashes)
-        n_lines += doc_hashes.size
+
+        deduplicates.add(hashes)
+
+        n_lines += hashes.size
+
+        keep = deduplicates[hashes] < 1
+        kept = keep.sum()
+        if kept == 0:
+            continue
+
+        lines = text.split("\n")
+        hashes = hashes * keep
+
+        # Remove duplicates inside doc
+        seen: Set[int] = set()
+        for i in range(len(hashes)):
+            if hashes[i] in seen:
+                hashes[i] = 0
+            seen.add(hashes[i])
+
+        new_lines = list(l for (l, h) in zip(lines, hashes) if h != 0)
+        text_dedup = "\n".join(new_lines)
+
+        doc["text"] = text_dedup
+        doc["lang"] = detect_lang(text_dedup.replace("\n", ""))
+        doc["text_hashes"] = [int(x) for x in hashes]
+        # doc["text_original"] = text
+
+        write(doc, output, output_dict)
+
+    try:
+        close_all(output_dict)
+    except:  # noqa
+        traceback.print_exc()
 
     # Free up mem even if the transformer is kept somewhere else.
-    hashes = FlatHashSet()
+    deduplicates = FlatHashSet()
+
+
+def write(doc, output, output_dict):
+    lang = doc["lang"]
+    if lang == "un":
+        return
+
+    lang_files = output_dict[lang]
+
+    output_path = Path(output)
+    lang_path = output_path / lang
+    lang_path.mkdir(parents=True, exist_ok=True)
+
+    url_file = lang_files.get("url", lzma.open(lang_path / "url.xz", "w"))
+    html_file = lang_files.get("html", lzma.open(lang_path / "html.xz", "w"))
+    text_file = lang_files.get("text", lzma.open(lang_path / "text.xz", "w"))
+
+    url_file.write(doc["url"].encode() + b"\n")
+    html_file.write(base64.b64encode(doc["html"].encode()) + b"\n")
+    text_file.write(base64.b64encode(doc["text"].encode()) + b"\n")
+
+    lang_files["url"] = url_file
+    lang_files["html"] = html_file
+    lang_files["text"] = text_file
+
+
+def close_all(output_dict):
+    for lang_files in output_dict.values():
+        for file in lang_files.values():
+            file.close()
 
 
 def compute_hashes(content) -> Optional[np.ndarray]:
