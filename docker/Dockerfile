@@ -1,19 +1,10 @@
-FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
 RUN sed -i.bak -e "s%http://archive.ubuntu.com/ubuntu/%http://ftp.jaist.ac.jp/pub/Linux/ubuntu/%g" /etc/apt/sources.list
 
 ENV TZ Asia/Tokyo
-
-RUN echo '# LANG' >> ~/.bashrc \
- && echo 'export LANG=ja_JP.UTF-8' >> ~/.bashrc
-
-RUN apt-get update \
-  && apt-get install -y tzdata \
-  && rm -rf /var/lib/apt/lists/* \
-  && echo "${TZ}" > /etc/timezone \
-  && rm /etc/localtime \
-  && ln -s /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
-  && dpkg-reconfigure -f noninteractive tzdata
+ENV LANG ja_JP.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && \
     apt-get install -y software-properties-common build-essential cmake pkg-config autoconf \
@@ -23,7 +14,7 @@ RUN apt-get update && \
         zlib1g-dev libbz2-dev \
         ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion \
         gawk \
-        language-pack-ja-base && \
+        tzdata language-pack-ja-base && \
     apt-get clean
 
 RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh -O ~/anaconda.sh && \
@@ -100,7 +91,7 @@ RUN git clone https://github.com/kpu/kenlm && \
     cd kenlm && mkdir build && cd build && cmake .. -DKENLM_MAX_ORDER=7 && make -j all install
 
 RUN git clone https://github.com/bitextor/bicleaner.git && \
-    cd bicleaner && git checkout bicleaner-0.13 && python setup.py install && \
+    cd bicleaner && git checkout bicleaner-0.13 && /opt/conda/bin/python setup.py install && \
     /opt/conda/bin/pip install mosestokenizer toolwrapper regex
 
 RUN git clone https://github.com/bitextor/bifixer.git && \
@@ -132,10 +123,9 @@ RUN git clone https://github.com/facebookresearch/fastText.git && \
     python setup.py install && \
     mkdir model && wget -O wget -O model/lid.176.bin https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
 
-RUN curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
-ENV PATH /root/.rbenv/bin:$PATH
-RUN rbenv init && \
-    echo 'export PATH=/root/.rbenv/bin:$PATH' >> ~/.bashrc && \
+ENV PATH /root/.rbenv/shims:/root/.rbenv/bin:$PATH
+RUN curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash || true
+RUN rbenv init || true && \
     echo 'eval "$(rbenv init -)"' >> ~/.bashrc && \
     apt-get install -y libssl-dev libreadline-dev && \
     rbenv install 2.6.5 && \
