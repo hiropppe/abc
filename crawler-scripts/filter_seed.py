@@ -9,10 +9,9 @@ from pathlib import Path
 
 @click.command()
 @click.argument("seeds_path")
-@click.option('--min_size', '-m', default=10, help='minimum warc size in MB')
+@click.option('--min_size', '-m', default=3, help='minimum warc size in MB')
 def main(seeds_path, min_size):
     CRAWLER = "heritrix"
-    #warc_path = DATA_DIR / "warc"
 
     def create_seed_dict(seeds):
         dic = defaultdict(list)
@@ -25,21 +24,10 @@ def main(seeds_path, min_size):
     crawled_hosts = []
     for line in sys.stdin:
         size, path = line.split()
-        unit = size.strip()[-1]
-        if unit == '0':
-            size = 0.0
-        elif unit == 'K':
-            size = float(size[:-1])/1024
-        elif unit == 'M':
-            size = float(size[:-1])
-        elif unit == 'G':
-            size = float(size[:-1])*1024
-        else:
-            pass
-
-        if size >= min_size:
+        size = int(size)
+        if size >= min_size*1024:
             dirname = path.split('/')[-2]
-            print(f'{dirname}\t{size}M', file=sys.stderr)
+            print(f'{dirname}\t{size/1024.0:.2f}M', file=sys.stderr)
             crawled_hosts.append(dirname)
 
     crawled_hosts = set(crawled_hosts)
