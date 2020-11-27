@@ -39,7 +39,7 @@ def create_domainkey2hosts(hosts):
 def get_domain_hosts(wildcards):
     output = []
     for h in domainkey2hosts[wildcards.target]:
-        output.append(f'{DATA_DIR:}/warc/{h:s}/{CRAWLER:s}.warc.gz')
+        output.append(f'{WARC_DIR:}/{h:s}/{CRAWLER:s}.warc.gz')
     return output
 
 
@@ -54,6 +54,7 @@ else:
 LANG1 = config["lang1"]
 LANG2 = config["lang2"]
 
+WARC_DIR = Path(config["warcDir"])
 PERMANENT_DIR = Path(config["permanentDir"])
 TRANSIENT_DIR = Path(config["transientDir"])
 DATA_DIR = Path(config["dataDir"])
@@ -241,7 +242,7 @@ TASK_LIST = config["task"]
 # print(TASK_LIST)
 
 # ================================== DETERMINE TARGET HOSTS ================================ #
-warc_path = DATA_DIR / "warc"
+warc_path = WARC_DIR
 crawled_hosts = set([d.name for d in warc_path.iterdir() if (d / "{:s}.warc.gz".format(CRAWLER)).exists()])
 # crawled_hosts = set()
 print(f"read hosts from warc dir={len(crawled_hosts):d}")

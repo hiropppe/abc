@@ -1,9 +1,12 @@
 # PARCOMINE CONFIG FILE
 
 temp: /tmp
-permanentDir: /data/bitextor/permanent/bitextor-output
-transientDir: /data/bitextor/transient
-dataDir: /data/bitextor/data
+
+warcDir: /warc
+
+permanentDir: /data/abc/permanent/bitextor-output
+transientDir: /data/abc/transient
+dataDir: /data/abc/data
 
 moses: /root/mosesdecoder
 mgiza: /root/mgiza
@@ -70,10 +73,10 @@ lang2: ja
 #hosts: ["www.iwc.com"]
 
 task: [
-    #    "concat",
-    #    "preprocessing",
-    #    "align-document",
-    #    "align-paragraph",
+    "concat",
+    "preprocessing",
+    "align-document",
+    "align-paragraph",
     "align-sentence",
     #    "filtering",
     "finish",
@@ -97,10 +100,10 @@ langId: cld2
 
 documentAligner: URL
 
-#paragraphAligner: STRAND
+paragraphAligner: STRAND
 
-#sentenceAligner: HUNALIGN
-sentenceAligner: LASER
+sentenceAligner: HUNALIGN
+#sentenceAligner: LASER
 
 #filter: BICLEANER
 #filter: ZIPPORAH
@@ -108,7 +111,7 @@ sentenceAligner: LASER
 strandThreshold: 0.1
 strandDpThreshold: 0.3
 
-hunalignDic: /data/bitextor/model/hunalign/en-ja/hunalign.en-ja.dic
+hunalignDic: /data/abc/model/hunalign/en-ja/hunalign.en-ja.dic
 hunalignThreshold: 0.0
 
 laser_model_dir: /root/LASER/models
@@ -118,18 +121,18 @@ laser_threshold: 0.9
 laser_enc_gpu: false
 laser_knn_gpu: false
 
-bicleanerConfig: /data/bitextor/model/bicleaner/en-ja/bicleaner.en-ja.yaml
+bicleanerConfig: /data/abc/model/bicleaner/en-ja/bicleaner.en-ja.yaml
 bicleanerThreshold: 0.4
 
-zipporahDir: "/data/bitextor/model/zipporah/en-ja"
-zipporahConfig: "/data/bitextor/model/zipporah/en-ja/config"
-zipporahModel: "/data/bitextor/model/zipporah/en-ja/en-ja.model"
-zipporahDic1: "/data/bitextor/model/zipporah/en-ja/dict.en-ja"
-zipporahDic2: "/data/bitextor/model/zipporah/en-ja/dict.ja-en"
-zipporahVocab1: "/data/bitextor/model/zipporah/en-ja/vocab.en"
-zipporahVocab2: "/data/bitextor/model/zipporah/en-ja/vocab.ja"
-zipporahLM1: "/data/bitextor/model/zipporah/en-ja/lm.en"
-zipporahLM2: "/data/bitextor/model/zipporah/en-ja/lm.ja"
+zipporahDir: "/data/abc/model/zipporah/en-ja"
+zipporahConfig: "/data/abc/model/zipporah/en-ja/config"
+zipporahModel: "/data/abc/model/zipporah/en-ja/en-ja.model"
+zipporahDic1: "/data/abc/model/zipporah/en-ja/dict.en-ja"
+zipporahDic2: "/data/abc/model/zipporah/en-ja/dict.ja-en"
+zipporahVocab1: "/data/abc/model/zipporah/en-ja/vocab.en"
+zipporahVocab2: "/data/abc/model/zipporah/en-ja/vocab.ja"
+zipporahLM1: "/data/abc/model/zipporah/en-ja/lm.en"
+zipporahLM2: "/data/abc/model/zipporah/en-ja/lm.ja"
 zipporahThreshold: 0.01
 
 bifixer: false
