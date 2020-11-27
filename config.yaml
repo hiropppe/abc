@@ -2,11 +2,11 @@
 
 temp: /tmp
 
-warcDir: /warc
+warcDir: /mnt/warc
 
-permanentDir: /data/abc/permanent/bitextor-output
-transientDir: /data/abc/transient
-dataDir: /data/abc/data
+permanentDir: /mnt/nfs/abc/permanent/bitextor-output
+transientDir: /mnt/nfs/abc/transient
+dataDir: /mnt/nfs/abc/data
 
 moses: /root/mosesdecoder
 mgiza: /root/mgiza
@@ -111,7 +111,7 @@ sentenceAligner: HUNALIGN
 strandThreshold: 0.1
 strandDpThreshold: 0.3
 
-hunalignDic: /data/abc/model/hunalign/en-ja/hunalign.en-ja.dic
+hunalignDic: /mnt/nfs/abc/model/hunalign/en-ja/hunalign.en-ja.dic
 hunalignThreshold: 0.0
 
 laser_model_dir: /root/LASER/models
@@ -121,18 +121,18 @@ laser_threshold: 0.9
 laser_enc_gpu: false
 laser_knn_gpu: false
 
-bicleanerConfig: /data/abc/model/bicleaner/en-ja/bicleaner.en-ja.yaml
+bicleanerConfig: /mnt/nfs/abc/model/bicleaner/en-ja/bicleaner.en-ja.yaml
 bicleanerThreshold: 0.4
 
-zipporahDir: "/data/abc/model/zipporah/en-ja"
-zipporahConfig: "/data/abc/model/zipporah/en-ja/config"
-zipporahModel: "/data/abc/model/zipporah/en-ja/en-ja.model"
-zipporahDic1: "/data/abc/model/zipporah/en-ja/dict.en-ja"
-zipporahDic2: "/data/abc/model/zipporah/en-ja/dict.ja-en"
-zipporahVocab1: "/data/abc/model/zipporah/en-ja/vocab.en"
-zipporahVocab2: "/data/abc/model/zipporah/en-ja/vocab.ja"
-zipporahLM1: "/data/abc/model/zipporah/en-ja/lm.en"
-zipporahLM2: "/data/abc/model/zipporah/en-ja/lm.ja"
+zipporahDir: "/mnt/nfs/abc/model/zipporah/en-ja"
+zipporahConfig: "/mnt/nfs/abc/model/zipporah/en-ja/config"
+zipporahModel: "/mnt/nfs/abc/model/zipporah/en-ja/en-ja.model"
+zipporahDic1: "/mnt/nfs/abc/model/zipporah/en-ja/dict.en-ja"
+zipporahDic2: "/mnt/nfs/abc/model/zipporah/en-ja/dict.ja-en"
+zipporahVocab1: "/mnt/nfs/abc/model/zipporah/en-ja/vocab.en"
+zipporahVocab2: "/mnt/nfs/abc/model/zipporah/en-ja/vocab.ja"
+zipporahLM1: "/mnt/nfs/abc/model/zipporah/en-ja/lm.en"
+zipporahLM2: "/mnt/nfs/abc/model/zipporah/en-ja/lm.ja"
 zipporahThreshold: 0.01
 
 bifixer: false
