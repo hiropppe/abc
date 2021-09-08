@@ -4,8 +4,14 @@ dataDir: /data
 
 crawlTimeLimit: "86400"
 
-heritrixPath: /data/heritrix
-heritrixUrl: https://localhost:8443
+heritrixPaths:
+  - /heritrix/0
+  - /heritrix/1
+  - /heritrix/2
+heritrixUrls:
+  - https://localhost:8440
+  - https://localhost:8441
+  - https://localhost:8442
 heritrixUser: admin:admin
 heritrixContactUs: https://paracrawl.eu/ 
 heritrixBeans: ./crawler-beans.cxml

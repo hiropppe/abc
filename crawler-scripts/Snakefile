@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import gzip
 import sys
 import tldextract
@@ -15,11 +16,13 @@ shell("mkdir -p "+TMP_DIR)
 
 CRAWLER = "heritrix"
 CRAWLTIMELIMIT = config.get("crawlTimeLimit", "")
-HERITRIXPATH = config["heritrixPath"]
-HERITRIXURL = config.get("heritrixUrl", "https://localhost:8443")
+HERITRIXPATHs = config["heritrixPaths"]
+HERITRIXURLs = config["heritrixUrls"]
 HERITRIXUSER = config.get("heritrixUser", "admin:admin")
 HERITRIXCONTACTUS = config["heritrixContactUs"]
 
+assert len(HERITRIXPATHs) == len(HERITRIXURLs)
+N_SHARDS = len(HERITRIXPATHs)
 
 def create_domain2hosts(hosts):
     ret = {}
@@ -44,6 +47,10 @@ def create_seed_dict(seeds):
         key = ".".join([ext.subdomain, ext.domain, ext.suffix]).lstrip(".")
         dic[key].append(seed)
     return dic
+
+
+def shard_no_of(url):
+    return int(hashlib.md5(url.encode()).hexdigest(), 16) % N_SHARDS
 
 
 # ================================== TARGET HOSTS ================================ #
@@ -100,15 +107,18 @@ rule heritrix:
         f'{DATA_DIR}/warc/{{target}}/heritrix.warc.gz'
     params:
         seeds = lambda wild: "\\n".join(seed_dict[wild["target"]]),
-        surt = lambda wild: "http://(" + tldextract.extract(wild["target"]).suffix + "," + tldextract.extract(wild["target"]).domain + ","
+        surt  = lambda wild: "http://(" + tldextract.extract(wild["target"]).suffix + "," + tldextract.extract(wild["target"]).domain + ",",
+        shard = lambda wild: shard_no_of(wild["target"]),
+        heritrix_path = lambda wild: HERITRIXPATHs[shard_no_of(wild["target"])],
+        heritrix_url  = lambda wild: HERITRIXURLs[shard_no_of(wild["target"])]
     shell:
         'echo hostname=$HOSTNAME; '
 
-        'echo "curl -d \\"createpath={wildcards.target}&action=create\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine"; '
-        'curl --silent --output /dev/null --show-error --fail -d "createpath={wildcards.target}&action=create" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine; '
+        'echo "curl -d \\"createpath={wildcards.target}&action=create\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine"; '
+        'curl --silent --output /dev/null --show-error --fail -d "createpath={wildcards.target}&action=create" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine; '
 
-        'echo "curl -d \\"action=teardown\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=teardown" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=teardown\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=teardown" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
 
         'DIRNAME=$(mktemp -d "{TMP_DIR}/downloaded.{wildcards.target}.XXXXXX"); '
         'echo $DIRNAME;'
@@ -116,46 +126,46 @@ rule heritrix:
         'echo "cat ./crawler-beans.cxml | sed \\"s@http://contact.us/@{HERITRIXCONTACTUS}@g\\" | sed \\"s@http://seed.com/@{params.seeds}@g\\" | sed \\"s@http://(com,surt,@{params.surt}@g\\" > $DIRNAME/my-crawler-beans.cxml"; '
         'cat ./crawler-beans.cxml | sed "s@http://contact.us/@{HERITRIXCONTACTUS}@g" | sed "s@http://seed.com/@{params.seeds}@g" | sed "s@http://(com,surt,@{params.surt}@g" > $DIRNAME/my-crawler-beans.cxml; '
 
-        'echo "curl -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml"; '
-        'curl --silent --output /dev/null --show-error --fail -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml; '
+        'echo "curl -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml"; '
+        'curl --silent --output /dev/null --show-error --fail -T $DIRNAME/my-crawler-beans.cxml -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}/jobdir/crawler-beans.cxml; '
 
-        'echo "curl -d \\"action=build\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=build" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=build\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=build" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
 
-        'echo "curl -d \\"action=launch&checkpoint=latest\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=launch&checkpoint=latest" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=launch&checkpoint=latest\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=launch&checkpoint=latest" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
 
         'sleep 10;'
-        'echo "curl -d \\"action=unpause\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=unpause" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=unpause\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=unpause" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
 
         'echo "Waiting for the warc.gz to be finished. TIMELIMIT={CRAWLTIMELIMIT}"; '
         'sleep 10;'
         'RUNTIME=0; INTERVAL=5; TIMED_OUT=0;'
-        'while [ -f {HERITRIXPATH}/jobs/{wildcards.target}/latest/warcs/*warc.gz.open ] ;'
+        'while [ -f {params.heritrix_path}/jobs/{wildcards.target}/latest/warcs/*warc.gz.open ] ;'
         '  do sleep 10 ;'
         '  RUNTIME=$((RUNTIME+INTERVAL)) ; '
         '  if [ "{CRAWLTIMELIMIT}" != "" ] ; then '
         '    if [ $RUNTIME -gt {CRAWLTIMELIMIT} ] ; then '
-        '      echo "curl -d \\"action=pause\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        '      curl --silent --output /dev/null --show-error --fail -d "action=pause" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
-        '      echo "curl -d \\"action=checkpoint\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        '      curl --silent --output /dev/null --show-error --fail -d "action=checkpoint" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        '      echo "curl -d \\"action=pause\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        '      curl --silent --output /dev/null --show-error --fail -d "action=pause" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
+        '      echo "curl -d \\"action=checkpoint\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        '      curl --silent --output /dev/null --show-error --fail -d "action=checkpoint" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
         '      TIMED_OUT=1;'
         '    fi ; '
         '  fi; '
         'done; '
 
         'if [ $TIMED_OUT -eq 0 ] ; then '
-        '      echo "curl -d \\"action=checkpoint\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        '      curl --silent --output /dev/null --show-error --fail -d "action=checkpoint" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        '      echo "curl -d \\"action=checkpoint\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        '      curl --silent --output /dev/null --show-error --fail -d "action=checkpoint" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
         'fi ; '
 
-        'echo "curl -d \\"action=terminate\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=terminate" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
-        'echo "curl -d \\"action=teardown\\" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}"; '
-        'curl --silent --output /dev/null --show-error --fail -d "action=teardown" -k -u {HERITRIXUSER} --anyauth --location {HERITRIXURL}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=terminate\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=terminate" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
+        'echo "curl -d \\"action=teardown\\" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}"; '
+        'curl --silent --output /dev/null --show-error --fail -d "action=teardown" -k -u {HERITRIXUSER} --anyauth --location {params.heritrix_url}/engine/job/{wildcards.target}; '
 
         'echo "Job {wildcards.target} finished! Runtime: ${{RUNTIME}} sec"; '
 
-        'find {HERITRIXPATH}/jobs/{wildcards.target} -type f -name "WEB-*.warc.gz" | xargs cat > {output}; '
+        'find {params.heritrix_path}/jobs/{wildcards.target} -type f -name "WEB-*.warc.gz" | xargs cat > {output}; '
