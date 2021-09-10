@@ -17,6 +17,7 @@ RUN pip --no-cache-dir install \
         ipykernel \
         snakemake \
         tldextract \
+        click \
         jedi flake8 autopep8
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
